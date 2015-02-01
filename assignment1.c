@@ -173,6 +173,16 @@ void setup(char inputBuffer[], char *args[], int *background)
   args[ct] = NULL; /* just in case the input line was > MAX_LINE */
 }
 
+int changeDirectory(char* path) {
+  int status = 0;
+  if (path == NULL) { //"cd" (default to home)
+    status = chdir(getenv("HOME"));
+  } else {
+    status = chdir(path);
+  }
+  return status;
+}
+
 int main(void) {
   char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
   int background;
@@ -192,6 +202,7 @@ int main(void) {
     // appendToHist(args);
 
     int shouldAddCommand = 1;
+    int shouldExecuteLater = 1;
 
     if (strcmp(args[0], "r") == 0) {
       if (args[1] == NULL) { //"r" command
@@ -200,7 +211,6 @@ int main(void) {
         char** lastCommandStartingWithX = NULL;
         temp = head;
         while(temp != NULL) {
-          printf("x is: %s\n", args[1]);
           if (temp -> data[0][0] == args[1][0]) {
             lastCommandStartingWithX = temp -> data;
           }
@@ -212,6 +222,17 @@ int main(void) {
         } else {
           copyExactStrArr(args, lastCommandStartingWithX);
         }
+      }
+    }
+
+    if (strcmp(args[0], "cd") == 0) {
+      //TODO: cd ~, cd -?
+      // printf("Custom CD\n");
+      shouldExecuteLater = 0;
+      if (changeDirectory(args[1]) == -1) {
+        printf("Error changing directory.\n");
+      } else {
+        //TODO: PWD because CD successful
       }
     }
 
@@ -230,7 +251,10 @@ int main(void) {
 
 
       // executeCommand(args);
-      execvp(args[0], args);
+      //
+      if (shouldExecuteLater) {
+        execvp(args[0], args);
+      }
 
 
 
