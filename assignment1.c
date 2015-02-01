@@ -6,7 +6,7 @@
 
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 
-int numCommands;
+int numCommands = 0;
 struct node
 {
     int id;
@@ -16,7 +16,6 @@ struct node
 
 void enqueue(char* command[]) {
   char **copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
-  printf("MEMORY COPYCOMMAND: %d", copyCommand);
   // printf("i: %d strlen(args[0]): %lu\n", 0, strlen(args));
   // printf("lenght of args: %lu", sizeof(args)/sizeof(args[0]));
   for (int i = 0; i < MAX_LINE/2; i++) {
@@ -30,37 +29,54 @@ void enqueue(char* command[]) {
   if (head == NULL) {
     // printf("null head\n");
     head = (struct node *)malloc(1*sizeof(struct node));
-    head -> id = 0;
+    head -> id = 1;
     head -> data = copyCommand;
     head -> next = NULL;
 
     tail = head;
-    printf("command(LL HEAD): %s, param: %s\n", head->data[0], head->data[1]);
+    // printf("command(LL HEAD): %s, param: %s\n", head->data[0], head->data[1]);
+    numCommands = 1;
   } else {
     //same command pointer??
-    printf("head command 1(LL): %s, param: %s\n", head->data[0], head->data[1]);
+    // printf("head command 1(LL): %s, param: %s\n", head->data[0], head->data[1]);
 
     temp = (struct node *)malloc(1*sizeof(struct node));
 
     temp -> id = tail -> id + 1;
-    printf("head command 2(LL): %s, param: %s\n", head->data[0], head->data[1]);
+    // printf("head command 2(LL): %s, param: %s\n", head->data[0], head->data[1]);
 
     tail -> next = temp;
-    printf("head command 3(LL): %s, param: %s\n", head->data[0], head->data[1]);
+    // printf("head command 3(LL): %s, param: %s\n", head->data[0], head->data[1]);
 
     temp -> data = copyCommand;
     temp -> next = NULL;
-    printf("head command 4(LL): %s, param: %s\n", head->data[0], head->data[1]);
+    // printf("head command 4(LL): %s, param: %s\n", head->data[0], head->data[1]);
 
-    printf("command(LL): %s, param: %s\n", temp->data[0], temp->data[1]);
+    // printf("command(LL): %s, param: %s\n", temp->data[0], temp->data[1]);
 
     tail = temp;
   }
   numCommands++; //total number of commands in history increments
 }
 
+void freeNode(struct node* nodeToBeFreed) {
+  nodeToBeFreed -> next = NULL;
+
+  char** data = nodeToBeFreed->data;
+  for (int i = 0; i < MAX_LINE/2; i++) {
+    if (data[i] == NULL) {
+      break;
+    }
+    free(data[i]);
+  }
+  free(nodeToBeFreed);
+}
+
+//Assume there is more than one node (head != tail)
 void dequeue() {
-  //free all command[i[]
+  temp = head;
+  head = head -> next;
+  freeNode(temp);
 }
 
 void printCommand(char** command) {
@@ -87,14 +103,20 @@ void showHistory() {
 }
 
 void appendToHist(char* command[]) {
+  printf("before appending to hist");
   enqueue(command);
-  // printf("command: %s, param: %s", command[0], command[1]);
+  if (numCommands > 11) { //11 because after numCommands incremented
+    dequeue();
+  }
+  printf("appended to hist");
 }
 
 void executeCommand(char* command[]) {
-  //TODO: Copy array of strings
+  printf("before executing command");
   appendToHist(command);
-  // execvp(command[0], command);
+  printf("command: %s, first param: %s", command[0], command[1]);
+
+  execvp(command[0], command);
 }
 
 /**
@@ -175,83 +197,18 @@ int main(void) {
     otherwise returns to the setup() function. */
 
 
-    // printf("command: %s, param: %s", args[0], args[1]);
+    printf("command: %s, first param: %s", args[0], args[1]);
 
     // int childPid = fork();
 
     // if (childPid == 0) {
-      // char *copyCommand[MAX_LINE/+1];
-      // // printf("i: %d strlen(args[0]): %lu\n", 0, strlen(args));
-      // //
-      // // printf("lenght of args: %lu", sizeof(args)/sizeof(args[0]));
 
-
-
-      // for (int i = 0; i < MAX_LINE/2; i++) {
-      //   if (args[i] == NULL) {
-      //     break;
-      //   }
-      //   printf("args[i]: %s\n", args[i]);
-
-      //   copyCommand[i] = malloc(strlen(args[i]) + 1);
-      //   strcpy(copyCommand[i], args[i]);
-
-      //   printf("i: %d, copyCommand[i]: %s\n", i, copyCommand[i]);
-      //   printf("i: %d, args[i]: %s\n", i, args[i]);
-
-      //   args[i] = "test";
-
-      //   printf("i: %d, copyCommand[i]: %s\n", i, copyCommand[i]);
-      //   printf("i: %d, args[i]: %s\n", i, args[i]);
-      //   // free(copy);
-
-      // }
-      // printf("FINISHED for");
-
-      // printf( "command to be executed: %s\n", args[0]);
-      // char** tempStrArr;
-      // printf("Sizeof args: %lu \n", sizeof(args));
-      // printf("Sizeof args[0]: %lu \n", sizeof(args[0]));
-      // printf("Sizeof char*: %lu \n", sizeof(char*));
-      // int sizeOfStrArr = sizeof(args) / sizeof(args[0]);
-      // printf("Sizeof str arr: %lu \n", sizeof(sizeOfStrArr));
-      // tempStrArr = (char **)malloc(sizeof(char *)* sizeOfStrArr);
-
-      // // char commandArr[]//try to copy inputbuffer and setup again?
-
-
-
-      // printf("before copied command: %s\n",  tempStrArr[0]);
-      // printf("before copied first argument: %s\n",  tempStrArr[1]);
-
-
-      // for(int i=0; i < sizeOfStrArr; i++) {
-      //   tempStrArr[i] = (char *)malloc(sizeof(char)*MAX_LINE/2);
-      //   printf("original comand: %s\n", args[i]);
-      //   strcpy(tempStrArr[i], args[i]);
-      //   printf("copied comand: %s\n", tempStrArr[i]);
-      //   printf("index: %d", i);
-      // }
-
-      // printf("copied command: %s\n",  tempStrArr[0]);
-      // printf("copied first argument: %s\n",  tempStrArr[1]);
-
-      // char * copy = malloc(strlen(original) + 1);
-      // strcpy(copy, original);
-      // ...
-      // free(copy);
 
       executeCommand(args);
 
-      // for (int i = 0; i < MAX_LINE/2; i++) {
-      //   if (copyCommand[i] == NULL) {
-      //     break;
-      //   }
-      //   free(copyCommand[i]);
-      // }
-      // free(copyCommand);
 
-      showHistory();
+
+      // showHistory();
 
     // } else if (background == 0) {
     //   int status;
