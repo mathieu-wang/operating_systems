@@ -16,6 +16,7 @@ struct node
 
 char** copyStrArray(char* command[]) {
   char** copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
+  // char *copyCommand[MAX_LINE/+1];
   // printf("i: %d strlen(args[0]): %lu\n", 0, strlen(args));
   // printf("lenght of args: %lu", sizeof(args)/sizeof(args[0]));
   for (int i = 0; i < MAX_LINE/2; i++) {
@@ -26,6 +27,17 @@ char** copyStrArray(char* command[]) {
     strcpy(copyCommand[i], command[i]);
   }
   return copyCommand;
+}
+
+void copyExactStrArr(char* copyCommand[], char* originalCommand[]) {
+  for (int i = 0; i < MAX_LINE/2; i++) {
+    if (originalCommand[i] == NULL) {
+      copyCommand[i] = NULL;
+    } else {
+      copyCommand[i] = malloc(strlen(originalCommand[i]) + 1);
+      strcpy(copyCommand[i], originalCommand[i]);
+    }
+  }
 }
 
 void enqueue(char* command[]) {
@@ -93,6 +105,7 @@ void showHistory() {
 }
 
 void appendToHist(char* command[]) {
+  printf("appending\n");
   enqueue(command);
   if (numCommands > 11) { //11 because after numCommands incremented
     dequeue();
@@ -176,21 +189,39 @@ int main(void) {
     (2) the child process will invoke execvp()
     (3) if background == 1, the parent will wait,
     otherwise returns to the setup() function. */
-    appendToHist(args);
+    // appendToHist(args);
 
+
+    if (strcmp(args[0], "r") == 0) {
+      if (args[1] == NULL) { //"r" command
+        copyExactStrArr(args, tail->data);
+        appendToHist(args);
+      } else { //'r x" command'
+        char** lastCommandStartingWithX;
+        temp = head;
+        while(temp != NULL) {
+          printf("x is: %s\n", args[1]);
+          if (temp -> data[0][0] == args[1][0]) {
+            lastCommandStartingWithX = temp -> data;
+          }
+          temp = temp -> next;
+        }
+        if (lastCommandStartingWithX == NULL) {
+          printf("No Command Starting with '%s'.\n", args[1]);
+        } else {
+          copyExactStrArr(args, lastCommandStartingWithX);
+          appendToHist(args);
+          //TODO: Execute custom commands with r x --> need to move history down?
+        }
+      }
+    }
 
     if(strcmp(args[0], "history") == 0) {
       showHistory();
-      // appendToHist(args);
-    } else if (strcmp(args[0], "r")) {
-      if (args[1] == NULL) { //"r" command
-
-      }
-    } else {
-      appendToHist(args);
     }
+    appendToHist(args);
 
-    printf("command: %s, first param: %s", args[0], args[1]);
+    printf("command: %s, first param: %s\n", args[0], args[1]);
 
     int childPid = fork();
 
