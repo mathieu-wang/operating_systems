@@ -14,8 +14,8 @@ struct node
     struct node *next;
 }*head,*tail,*temp;
 
-void enqueue(char* command[]) {
-  char **copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
+char** copyStrArray(char* command[]) {
+  char** copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
   // printf("i: %d strlen(args[0]): %lu\n", 0, strlen(args));
   // printf("lenght of args: %lu", sizeof(args)/sizeof(args[0]));
   for (int i = 0; i < MAX_LINE/2; i++) {
@@ -25,35 +25,25 @@ void enqueue(char* command[]) {
     copyCommand[i] = malloc(strlen(command[i]) + 1);
     strcpy(copyCommand[i], command[i]);
   }
+  return copyCommand;
+}
+
+void enqueue(char* command[]) {
+  char** copyCommand = copyStrArray(command);
 
   if (head == NULL) {
-    // printf("null head\n");
     head = (struct node *)malloc(1*sizeof(struct node));
     head -> id = 1;
     head -> data = copyCommand;
     head -> next = NULL;
-
     tail = head;
-    // printf("command(LL HEAD): %s, param: %s\n", head->data[0], head->data[1]);
     numCommands = 1;
   } else {
-    //same command pointer??
-    // printf("head command 1(LL): %s, param: %s\n", head->data[0], head->data[1]);
-
     temp = (struct node *)malloc(1*sizeof(struct node));
-
     temp -> id = tail -> id + 1;
-    // printf("head command 2(LL): %s, param: %s\n", head->data[0], head->data[1]);
-
     tail -> next = temp;
-    // printf("head command 3(LL): %s, param: %s\n", head->data[0], head->data[1]);
-
     temp -> data = copyCommand;
     temp -> next = NULL;
-    // printf("head command 4(LL): %s, param: %s\n", head->data[0], head->data[1]);
-
-    // printf("command(LL): %s, param: %s\n", temp->data[0], temp->data[1]);
-
     tail = temp;
   }
   numCommands++; //total number of commands in history increments
@@ -91,7 +81,7 @@ void printCommand(char** command) {
 
 void showHistory() {
   if (head == NULL) {
-    printf("No History Yet.");
+    printf("No History Yet.\n");
   } else {
     temp = head;
     while (temp != NULL) {
@@ -103,20 +93,10 @@ void showHistory() {
 }
 
 void appendToHist(char* command[]) {
-  printf("before appending to hist");
   enqueue(command);
   if (numCommands > 11) { //11 because after numCommands incremented
     dequeue();
   }
-  printf("appended to hist");
-}
-
-void executeCommand(char* command[]) {
-  printf("before executing command");
-  appendToHist(command);
-  printf("command: %s, first param: %s", command[0], command[1]);
-
-  execvp(command[0], command);
 }
 
 /**
@@ -124,6 +104,7 @@ void executeCommand(char* command[]) {
  * tokens using whitespace (space or tab) as delimiters. setup() sets
  * the args parameter as a null-terminated string.
  */
+//TODO: RETURN SUCCESS VS FAILURE
 void setup(char inputBuffer[], char *args[], int *background)
 {
   int length, /* # of characters in the command line */
@@ -195,27 +176,43 @@ int main(void) {
     (2) the child process will invoke execvp()
     (3) if background == 1, the parent will wait,
     otherwise returns to the setup() function. */
+    appendToHist(args);
 
+
+    if(strcmp(args[0], "history") == 0) {
+      showHistory();
+      // appendToHist(args);
+    } else if (strcmp(args[0], "r")) {
+      if (args[1] == NULL) { //"r" command
+
+      }
+    } else {
+      appendToHist(args);
+    }
 
     printf("command: %s, first param: %s", args[0], args[1]);
 
-    // int childPid = fork();
+    int childPid = fork();
 
-    // if (childPid == 0) {
+    if (childPid == 0) {
 
 
-      executeCommand(args);
+      // executeCommand(args);
+      execvp(args[0], args);
 
 
 
       // showHistory();
 
-    // } else if (background == 0) {
-    //   int status;
-    //   waitpid(childPid, &status, 0);
-    // } else {
-      // printf("in parent");
-    // }
+    } else if (background == 0) {
+      int status;
+      waitpid(childPid, &status, 0);
+    } else {
+      printf("in parent");
+    }
+
+
+    // showHistory();
   }
 
   return 0;
