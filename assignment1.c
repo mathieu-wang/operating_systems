@@ -191,13 +191,13 @@ int main(void) {
     otherwise returns to the setup() function. */
     // appendToHist(args);
 
+    int shouldAddCommand = 1;
 
     if (strcmp(args[0], "r") == 0) {
       if (args[1] == NULL) { //"r" command
         copyExactStrArr(args, tail->data);
-        appendToHist(args);
       } else { //'r x" command'
-        char** lastCommandStartingWithX;
+        char** lastCommandStartingWithX = NULL;
         temp = head;
         while(temp != NULL) {
           printf("x is: %s\n", args[1]);
@@ -208,18 +208,19 @@ int main(void) {
         }
         if (lastCommandStartingWithX == NULL) {
           printf("No Command Starting with '%s'.\n", args[1]);
+          shouldAddCommand = 0;
         } else {
           copyExactStrArr(args, lastCommandStartingWithX);
-          appendToHist(args);
-          //TODO: Execute custom commands with r x --> need to move history down?
         }
       }
     }
 
-    if(strcmp(args[0], "history") == 0) {
+    if (strcmp(args[0], "history") == 0) {
       showHistory();
     }
-    appendToHist(args);
+    if (shouldAddCommand) {
+      appendToHist(args);
+    }
 
     printf("command: %s, first param: %s\n", args[0], args[1]);
 
