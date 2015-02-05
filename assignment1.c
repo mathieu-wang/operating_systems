@@ -1,3 +1,6 @@
+//Mathieu Wang
+//260472680
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -8,12 +11,17 @@
 #define PATH_MAX 4096
 
 int numCommands = 0;
+
+//Implement queue using a linked list. Each node has a command as its data.
 struct node
 {
     int id;
     char** data;
     struct node *next;
 }*head,*tail,*temp;
+
+pid_t backgroundProcesses[1024]; //maximum 1024 concurrent processes
+int currentProcessIndex = 0;
 
 char** copyStrArray(char* command[]) {
   char** copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
@@ -184,6 +192,14 @@ int changeDirectory(char* path) {
   return status;
 }
 
+int clearZombieProcesses() {
+  int status;
+  for (int i = 0; i < currentProcessIndex; i++) {
+    waitpid(backgroundProcesses[i], &status, WNOHANG);
+  }
+  return status;
+}
+
 int main(void) {
   char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
   int background;
@@ -191,6 +207,10 @@ int main(void) {
   /* equals 1 if a command is followed by '&' */
   /* command line (of 80) has max of 40 arguments */
   while (1){
+    clearZombieProcesses();
+    //TODO: problem: sleep 999&, jobs, r, history, r j --> gone
+
+
     background = 0;
     printf(" COMMAND->\n");
     setup(inputBuffer,args,&background);
@@ -255,6 +275,16 @@ int main(void) {
       exit(0);
     }
 
+    if (strcmp(args[0], "jobs") == 0) {
+      printf("Background Processes:\n");
+      for (int i = 0; i < currentProcessIndex; i++) {
+        int status;
+        if (waitpid(backgroundProcesses[i], &status, WNOHANG) == 0) {
+          printf("%d\n", backgroundProcesses[i]);
+        }
+      }
+    }
+
     if (shouldAddCommand) {
       appendToHist(args);
     }
@@ -263,20 +293,21 @@ int main(void) {
 
     // printf("command: %s, first param: %s\n", args[0], args[1]);
 
-    int childPid = fork();
+    pid_t childPid = fork();
 
-    if (childPid == 0) {
+    if (childPid == 0) { //in child
 
       if (shouldExecuteLater) {
         execvp(args[0], args);
       }
 
 
-    } else if (background == 0) {
+    } else if (background == 0) { //in parent, but needs to wait for child
       int status;
       waitpid(childPid, &status, 0);
-    } else {
-      printf("in parent");
+    } else { //in parent, but doesn't wait for child. Add to background processes
+      backgroundProcesses[currentProcessIndex] = childPid;
+      currentProcessIndex++;
     }
 
 
