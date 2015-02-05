@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
+#define PATH_MAX 4096
 
 int numCommands = 0;
 struct node
@@ -117,7 +118,7 @@ void appendToHist(char* command[]) {
  * tokens using whitespace (space or tab) as delimiters. setup() sets
  * the args parameter as a null-terminated string.
  */
-//TODO: RETURN SUCCESS VS FAILURE
+//TODO: RETURN SUCCESS VS FAILURE for exit FAILURE
 void setup(char inputBuffer[], char *args[], int *background)
 {
   int length, /* # of characters in the command line */
@@ -236,29 +237,40 @@ int main(void) {
       }
     }
 
+    if (strcmp(args[0], "pwd") == 0) {
+      char buffer[PATH_MAX];
+      char* currentDir = getcwd(buffer, PATH_MAX);
+      if (currentDir == NULL) {
+        printf("Error printing current directory\n");
+      } else {
+        printf("%s\n", buffer);
+      }
+    }
+
     if (strcmp(args[0], "history") == 0) {
       showHistory();
     }
+
+    if (strcmp(args[0], "exit") == 0) {
+      exit(0);
+    }
+
     if (shouldAddCommand) {
       appendToHist(args);
     }
 
-    printf("command: %s, first param: %s\n", args[0], args[1]);
+    //TODO: waitpid(PID, &status, WNOHANG)
+
+    // printf("command: %s, first param: %s\n", args[0], args[1]);
 
     int childPid = fork();
 
     if (childPid == 0) {
 
-
-      // executeCommand(args);
-      //
       if (shouldExecuteLater) {
         execvp(args[0], args);
       }
 
-
-
-      // showHistory();
 
     } else if (background == 0) {
       int status;
