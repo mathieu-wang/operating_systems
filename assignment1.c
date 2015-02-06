@@ -10,6 +10,8 @@
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 #define PATH_MAX 4096
 #define MAX_NUM_PROCESSES 1024
+#define SETUP_SUCCESS 1
+#define NORMAL_EXIT_SIGNAL 0
 
 int numCommands = 0;
 
@@ -140,7 +142,7 @@ int noJobWithPID(long pid) {
  * the args parameter as a null-terminated string.
  */
 //TODO: RETURN SUCCESS VS FAILURE for exit FAILURE
-void setup(char inputBuffer[], char *args[], int *background)
+int setup(char inputBuffer[], char *args[], int *background)
 {
   int length, /* # of characters in the command line */
     i,        /* loop index for accessing inputBuffer array */
@@ -156,12 +158,12 @@ void setup(char inputBuffer[], char *args[], int *background)
   if (length == 0) {
     /* ctrl-d was entered, quit the shell normally */
     printf("\n");
-    exit(0);
+    return 0;
   }
   if (length < 0) {
     /* somthing wrong; terminate with error code of -1 */
     perror("Reading the command");
-    exit(-1);
+    return -1;
   }
 
   /* examine every character in the inputBuffer */
@@ -193,6 +195,7 @@ void setup(char inputBuffer[], char *args[], int *background)
       }
   }
   args[ct] = NULL; /* just in case the input line was > MAX_LINE */
+  return 1;
 }
 
 int changeDirectory(char* path) {
@@ -224,10 +227,15 @@ int main(void) {
     // clearZombieProcesses();
     //TODO: problem: sleep 999&, jobs, history, jobs --> gone
 
-
     background = 0;
     printf(" COMMAND->\n");
-    setup(inputBuffer,args,&background);
+    int setupStatus = setup(inputBuffer,args,&background);
+    if (setupStatus != SETUP_SUCCESS) {
+      if (setupStatus != NORMAL_EXIT_SIGNAL) {
+        printf("Error parsing command, exiting shell\n");
+      }
+      exit(setupStatus);
+    }
     /* Program terminates normally inside setup */ /* get next command */
     /* the steps are:
     (1) fork a child process using fork()
@@ -308,7 +316,7 @@ int main(void) {
 
     if (strcmp(args[0], "history") == 0) {
       showHistory();
-      // shouldExecuteLater = 0;
+      shouldExecuteLater = 0;
     }
 
     if (strcmp(args[0], "exit") == 0) {
