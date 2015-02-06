@@ -356,26 +356,21 @@ int main(void) {
 
     // printf("command: %s, first param: %s\n", args[0], args[1]);
 
-    pid_t childPid = fork();
+    if (shouldExecuteLater) {
+      pid_t childPid = fork();
 
-    if (childPid == 0) { //in child
-
-      if (shouldExecuteLater) {
+      if (childPid == 0) { //in child
         execvp(args[0], args);
+
+      } else if (background == 0) { //in parent, but needs to wait for child
+        int status;
+        int result = waitpid(childPid, &status, 0);
+      } else { //in parent, but doesn't wait for child. Add to background processes
+        backgroundProcesses[currentProcessIndex] = childPid;
+        printf("%d", childPid);
+        currentProcessIndex++;
       }
-
-
-    } else if (background == 0) { //in parent, but needs to wait for child
-      int status;
-      int result = waitpid(childPid, &status, 0);
-    } else { //in parent, but doesn't wait for child. Add to background processes
-      backgroundProcesses[currentProcessIndex] = childPid;
-      printf("%d", childPid);
-      currentProcessIndex++;
     }
-
-
-    // showHistory();
   }
 
   return 0;
