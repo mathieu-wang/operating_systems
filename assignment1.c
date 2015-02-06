@@ -23,16 +23,13 @@ struct node
     struct node *next;
 }*head,*tail,*temp;
 
-//TODO: wrap around
 pid_t backgroundProcesses[MAX_NUM_PROCESSES]; //maximum 1024 concurrent processes
 int currentProcessIndex = 0;
 int numProcesses = 0;
 
+//copy a string array and return the copy
 char** copyStrArray(char* command[]) {
   char** copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
-  // char *copyCommand[MAX_LINE/+1];
-  // printf("i: %d strlen(args[0]): %lu\n", 0, strlen(args));
-  // printf("lenght of args: %lu", sizeof(args)/sizeof(args[0]));
   for (int i = 0; i < MAX_LINE/2; i++) {
     if (command[i] == NULL) {
       break;
@@ -43,6 +40,7 @@ char** copyStrArray(char* command[]) {
   return copyCommand;
 }
 
+//copy a string array into the given copy array
 void copyExactStrArr(char* copyCommand[], char* originalCommand[]) {
   for (int i = 0; i < MAX_LINE/2; i++) {
     if (originalCommand[i] == NULL) {
@@ -125,6 +123,7 @@ void appendToHist(char* command[]) {
   }
 }
 
+//verify whether there is no running job with the given pid
 int noJobWithPID(long pid) {
   int jobExists = 0;
   for (int i = 0; i < MAX_NUM_PROCESSES; i++) {
@@ -200,7 +199,7 @@ int setup(char inputBuffer[], char *args[], int *background)
 
 int changeDirectory(char* path) {
   int status = 0;
-  if (path == NULL) { //"cd" (default to home)
+  if (path == NULL || strcmp(path, "~") == 0) { //"cd" (default to home)
     status = chdir(getenv("HOME"));
   } else {
     status = chdir(path);
@@ -212,7 +211,6 @@ int clearZombieProcesses() {
   int status;
   for (int i = 0; i < currentProcessIndex; i++) {
     int result = waitpid(backgroundProcesses[i], &status, WNOHANG);
-    printf("id: %d, status: %d, result: %d \n", i, status, result);
     if (result == -1) {
       backgroundProcesses[i] = 0;
     }
@@ -220,7 +218,49 @@ int clearZombieProcesses() {
   return status;
 }
 
+void printWorkingDirectory() {
+  char buffer[PATH_MAX];
+  char* currentDir = getcwd(buffer, PATH_MAX);
+  if (currentDir == NULL) {
+    printf("Error printing current directory\n");
+  } else {
+    printf("%s\n", buffer);
+  }
+}
 
+void showJobs() {
+  int jobsCount = 0;
+  for (int i = 0; i < MAX_NUM_PROCESSES; i++) {
+    if (backgroundProcesses[i] > 0) {
+       printf("pid: %d\n", backgroundProcesses[i]);
+       jobsCount++;
+    }
+  }
+  if (jobsCount == 0) {
+    printf("No background process running.\n");
+  }
+}
+
+void bringToForeground(char* args[]) {
+  if (args[1] == NULL) {
+      printf("Usage: fg PID\n");
+  } else {
+    int status;
+    int base = 10;
+
+    // convert the args[1] to long
+    pid_t pid = (pid_t)strtol(args[1], NULL, base);
+
+    if (noJobWithPID(pid)) {
+      printf("No job with PID %d\n", pid);
+    } else {
+      printf("Bringing process %d to foreground\n", pid);
+      if (waitpid(pid, &status, 0) < 0) {
+        printf("Invalid PID\n");
+      }
+    }
+  }
+}
 
 int main(void) {
   char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
@@ -230,7 +270,6 @@ int main(void) {
   /* command line (of 80) has max of 40 arguments */
   while (1){
     clearZombieProcesses();
-    //TODO: problem: sleep 999&, jobs, history, jobs --> gone
 
     background = 0;
     printf(" COMMAND->\n");
@@ -247,35 +286,17 @@ int main(void) {
     (2) the child process will invoke execvp()
     (3) if background == 1, the parent will wait,
     otherwise returns to the setup() function. */
-    // appendToHist(args);
 
     int shouldAddCommand = 1;
     int shouldExecuteLater = 1;
 
-    if(strcmp(args[0], "fg") == 0) {
-      if (args[1] == NULL) {
-          printf("Usage: fg PID\n");
-      } else {
-        int status;
-        int base = 10;
-        // convert the args[1] to long
-        pid_t pid = (pid_t)strtol(args[1], NULL, base);
-
-        if (noJobWithPID(pid)) {
-          printf("No job with PID %d\n", pid);
-        } else {
-          printf("Bringing process %d to foreground\n", pid);
-          if (waitpid(pid, &status, 0) < 0) {
-            printf("Invalid PID\n");
-          }
-        }
-      }
-      shouldExecuteLater = 0;
-    }
-
     if (strcmp(args[0], "r") == 0) {
       if (args[1] == NULL) { //"r" command
-        copyExactStrArr(args, tail->data);
+        if (head == NULL) {
+          printf("No previous command.\n");
+        } else {
+          copyExactStrArr(args, tail->data);
+        }
       } else { //'r x" command'
         char** lastCommandStartingWithX = NULL;
         temp = head;
@@ -296,23 +317,16 @@ int main(void) {
 
     if (strcmp(args[0], "cd") == 0) {
       //TODO: cd ~, cd -?
-      // printf("Custom CD\n");
-      shouldExecuteLater = 0;
       if (changeDirectory(args[1]) == -1) {
         printf("Error changing directory.\n");
       } else {
-        //TODO: PWD because CD successful
+        printWorkingDirectory();
       }
+      shouldExecuteLater = 0;
     }
 
     if (strcmp(args[0], "pwd") == 0) {
-      char buffer[PATH_MAX];
-      char* currentDir = getcwd(buffer, PATH_MAX);
-      if (currentDir == NULL) {
-        printf("Error printing current directory\n");
-      } else {
-        printf("%s\n", buffer);
-      }
+      printWorkingDirectory();
       shouldExecuteLater = 0;
     }
 
@@ -325,38 +339,19 @@ int main(void) {
       exit(0);
     }
 
-    if (strcmp(args[0], "jobs") == 0) {
-      int jobsCount = 0;
-      for (int i = 0; i < MAX_NUM_PROCESSES; i++) {
-        if (backgroundProcesses[i] > 0) {
-           // printf("[%d]\t%d\n", jobsCount++, backgroundProcesses[i]);
-           printf("pid: %d\n", backgroundProcesses[i]);
-           jobsCount++;
-        }
-      }
-      if (jobsCount == 0) {
-        printf("No background process running.\n");
-      }
-
-
-      // printf("Background Processes:\n");
-      // for (int i = 0; i < currentProcessIndex; i++) {
-      //   int status;
-      //   if (waitpid(backgroundProcesses[i], &status, WNOHANG) == 0) {
-      //     printf("%d\n", backgroundProcesses[i]);
-      //   }
-      // }
+    if(strcmp(args[0], "fg") == 0) {
+      bringToForeground(args);
       shouldExecuteLater = 0;
     }
 
+    if (strcmp(args[0], "jobs") == 0) {
+      showJobs();
+      shouldExecuteLater = 0;
+    }
 
     if (shouldAddCommand) {
       appendToHist(args);
     }
-
-    //TODO: waitpid(PID, &status, WNOHANG)
-
-    // printf("command: %s, first param: %s\n", args[0], args[1]);
 
     if (shouldExecuteLater) {
       pid_t childPid = fork();
@@ -369,7 +364,6 @@ int main(void) {
         int result = waitpid(childPid, &status, 0);
       } else { //in parent, but doesn't wait for child. Add to background processes
         backgroundProcesses[currentProcessIndex] = childPid;
-        printf("%d", childPid);
         currentProcessIndex++;
         if (currentProcessIndex == MAX_NUM_PROCESSES) {
           currentProcessIndex = currentProcessIndex % MAX_NUM_PROCESSES;
