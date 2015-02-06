@@ -9,6 +9,7 @@
 
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 #define PATH_MAX 4096
+#define MAX_NUM_PROCESSES 1024
 
 int numCommands = 0;
 
@@ -20,8 +21,10 @@ struct node
     struct node *next;
 }*head,*tail,*temp;
 
-pid_t backgroundProcesses[1024]; //maximum 1024 concurrent processes
+//TODO: wrap around
+pid_t backgroundProcesses[MAX_NUM_PROCESSES]; //maximum 1024 concurrent processes
 int currentProcessIndex = 0;
+int numProcesses = 0;
 
 char** copyStrArray(char* command[]) {
   char** copyCommand = malloc(sizeof(char*)*MAX_LINE/+1);
@@ -114,11 +117,21 @@ void showHistory() {
 }
 
 void appendToHist(char* command[]) {
-  printf("appending\n");
   enqueue(command);
   if (numCommands > 11) { //11 because after numCommands incremented
     dequeue();
   }
+}
+
+int noJobWithPID(long pid) {
+  int jobExists = 0;
+  for (int i = 0; i < MAX_NUM_PROCESSES; i++) {
+    if (backgroundProcesses[i] == pid) {
+      jobExists = 1;
+      break;
+    }
+  }
+  return !jobExists;
 }
 
 /**
@@ -195,7 +208,8 @@ int changeDirectory(char* path) {
 int clearZombieProcesses() {
   int status;
   for (int i = 0; i < currentProcessIndex; i++) {
-    waitpid(backgroundProcesses[i], &status, WNOHANG);
+    int result = waitpid(backgroundProcesses[i], &status, WNOHANG);
+    printf("id: %d, status: %d\n", i, status);
   }
   return status;
 }
@@ -207,8 +221,8 @@ int main(void) {
   /* equals 1 if a command is followed by '&' */
   /* command line (of 80) has max of 40 arguments */
   while (1){
-    clearZombieProcesses();
-    //TODO: problem: sleep 999&, jobs, r, history, r j --> gone
+    // clearZombieProcesses();
+    //TODO: problem: sleep 999&, jobs, history, jobs --> gone
 
 
     background = 0;
@@ -224,6 +238,30 @@ int main(void) {
 
     int shouldAddCommand = 1;
     int shouldExecuteLater = 1;
+
+    //TODO: Does not work after custom command, but works with say sleep 77& then fg <pid>
+    if(strcmp(args[0], "fg") == 0) {
+      if (args[1] == NULL) {
+          printf("Usage: fg PID\n");
+      } else {
+        int status;
+        int base = 10;
+        // convert the args[1] to long
+        pid_t pid = (pid_t)strtol(args[1], NULL, base);
+
+        if (noJobWithPID(pid)) {
+          printf("No job with PID %d\n", pid);
+        } else {
+        // if (waitpid(pid, &status, 0) < 0) {
+        //   printf("Invalid PID\n");
+        // }
+          printf("Bringing process %d to foreground\n", pid);
+          printf("result: %d\n", waitpid(pid, &status, WUNTRACED)); //TODO also remove from backgroundProcesses
+        // // }
+        }
+        shouldExecuteLater = 0;
+      }
+    }
 
     if (strcmp(args[0], "r") == 0) {
       if (args[1] == NULL) { //"r" command
@@ -265,10 +303,12 @@ int main(void) {
       } else {
         printf("%s\n", buffer);
       }
+      shouldExecuteLater = 0;
     }
 
     if (strcmp(args[0], "history") == 0) {
       showHistory();
+      // shouldExecuteLater = 0;
     }
 
     if (strcmp(args[0], "exit") == 0) {
@@ -276,14 +316,29 @@ int main(void) {
     }
 
     if (strcmp(args[0], "jobs") == 0) {
-      printf("Background Processes:\n");
-      for (int i = 0; i < currentProcessIndex; i++) {
-        int status;
-        if (waitpid(backgroundProcesses[i], &status, WNOHANG) == 0) {
-          printf("%d\n", backgroundProcesses[i]);
+      int jobsCount = 0;
+      for (int i = 0; i < MAX_NUM_PROCESSES; i++) {
+        if (backgroundProcesses[i] > 0) {
+           // printf("[%d]\t%d\n", jobsCount++, backgroundProcesses[i]);
+           printf("pid: %d\n", backgroundProcesses[i]);
+           jobsCount++;
         }
       }
+      if (jobsCount == 0) {
+        printf("No background process running.\n");
+      }
+
+
+      // printf("Background Processes:\n");
+      // for (int i = 0; i < currentProcessIndex; i++) {
+      //   int status;
+      //   if (waitpid(backgroundProcesses[i], &status, WNOHANG) == 0) {
+      //     printf("%d\n", backgroundProcesses[i]);
+      //   }
+      // }
+      shouldExecuteLater = 0;
     }
+
 
     if (shouldAddCommand) {
       appendToHist(args);
@@ -304,9 +359,10 @@ int main(void) {
 
     } else if (background == 0) { //in parent, but needs to wait for child
       int status;
-      waitpid(childPid, &status, 0);
+      int result = waitpid(childPid, &status, 0);
     } else { //in parent, but doesn't wait for child. Add to background processes
       backgroundProcesses[currentProcessIndex] = childPid;
+      printf("%d", childPid);
       currentProcessIndex++;
     }
 
