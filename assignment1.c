@@ -212,10 +212,15 @@ int clearZombieProcesses() {
   int status;
   for (int i = 0; i < currentProcessIndex; i++) {
     int result = waitpid(backgroundProcesses[i], &status, WNOHANG);
-    printf("id: %d, status: %d\n", i, status);
+    printf("id: %d, status: %d, result: %d \n", i, status, result);
+    if (result == -1) {
+      backgroundProcesses[i] = 0;
+    }
   }
   return status;
 }
+
+
 
 int main(void) {
   char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
@@ -224,7 +229,7 @@ int main(void) {
   /* equals 1 if a command is followed by '&' */
   /* command line (of 80) has max of 40 arguments */
   while (1){
-    // clearZombieProcesses();
+    clearZombieProcesses();
     //TODO: problem: sleep 999&, jobs, history, jobs --> gone
 
     background = 0;
@@ -247,7 +252,6 @@ int main(void) {
     int shouldAddCommand = 1;
     int shouldExecuteLater = 1;
 
-    //TODO: Does not work after custom command, but works with say sleep 77& then fg <pid>
     if(strcmp(args[0], "fg") == 0) {
       if (args[1] == NULL) {
           printf("Usage: fg PID\n");
@@ -260,15 +264,13 @@ int main(void) {
         if (noJobWithPID(pid)) {
           printf("No job with PID %d\n", pid);
         } else {
-        // if (waitpid(pid, &status, 0) < 0) {
-        //   printf("Invalid PID\n");
-        // }
           printf("Bringing process %d to foreground\n", pid);
-          printf("result: %d\n", waitpid(pid, &status, WUNTRACED)); //TODO also remove from backgroundProcesses
-        // // }
+          if (waitpid(pid, &status, 0) < 0) {
+            printf("Invalid PID\n");
+          }
         }
-        shouldExecuteLater = 0;
       }
+      shouldExecuteLater = 0;
     }
 
     if (strcmp(args[0], "r") == 0) {
@@ -369,6 +371,9 @@ int main(void) {
         backgroundProcesses[currentProcessIndex] = childPid;
         printf("%d", childPid);
         currentProcessIndex++;
+        if (currentProcessIndex == MAX_NUM_PROCESSES) {
+          currentProcessIndex = currentProcessIndex % MAX_NUM_PROCESSES;
+        }
       }
     }
   }
