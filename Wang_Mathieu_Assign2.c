@@ -12,87 +12,62 @@ static sem_t rw_mutex;
 static sem_t mutex;
 int read_count = 0;
 
-/*
-static void *threadFunc(void *arg) {
-  int loops = *((int *) arg);
-  int loc, j;
-
-  for (j = 0; j < loops; j++) {
-
-     if (sem_wait(&sem) == -1)
-       exit(2);
-
-    loc = target;
-    loc++;
-    target = loc;
-
-        if (sem_post(&sem) == -1)
-         exit(2);
-  }
-  return NULL;
-}
-*/
-
 static void *writeThreadFunc(void *arg) {
-  do {
+  if (sem_wait(&rw_mutex) == -1) {
+    printf("Error waiting for rw_mutex\n");
+    exit(2);
+  }
+
+  //critical section
+  target += 10;
+  printf("Target: %d\n", target);
+  //end critical section
+
+  if (sem_post(&rw_mutex) == -1) {
+    printf("Error signalling for rw_mutex\n");
+    exit(2);
+  }
+}
+
+static void *readThreadFunc(void *arg) {
+  if (sem_wait(&mutex) == -1) {
+    printf("Error waiting for mutex\n");
+    exit(2);
+  }
+  read_count++;
+  if (read_count == 1) {
     if (sem_wait(&rw_mutex) == -1) {
       printf("Error waiting for rw_mutex\n");
       exit(2);
     }
+  }
+  if (sem_post(&mutex) == -1) {
+    printf("Error signalling for mutex\n");
+    exit(2);
+  }
 
-    //critical section
-    target += 10;
-    printf("Target: %d\n", target);
-    //end critical section
+  //critical section
+  int local = target;
+  printf("Got target: %d\n", local);
+  printf("read_count: %d\n", read_count);
+  //end critical section
 
+  if (sem_wait(&mutex) == -1) {
+    printf("Error waiting for mutex\n");
+    exit(2);
+  }
+  read_count--;
+  if (read_count == 0) {
     if (sem_post(&rw_mutex) == -1) {
       printf("Error signalling for rw_mutex\n");
       exit(2);
     }
-  } while (1);
-}
+  }
 
-static void *readThreadFunc(void *arg) {
-  do {
-    if (sem_wait(&mutex) == -1) {
-      printf("Error waiting for mutex\n");
-      exit(2);
-    }
-    read_count++;
-    if (read_count == 1) {
-      if (sem_wait(&rw_mutex) == -1) {
-        printf("Error waiting for rw_mutex\n");
-        exit(2);
-      }
-    }
-    if (sem_post(&mutex) == -1) {
-      printf("Error signalling for mutex\n");
-      exit(2);
-    }
-
-    //critical section
-    int local = target;
-    printf("Got target: %d\n", local);
-    printf("read_count: %d\n", read_count);
-    //end critical section
-
-    if (sem_wait(&mutex) == -1) {
-      printf("Error waiting for mutex\n");
-      exit(2);
-    }
-    read_count--;
-    if (read_count == 0) {
-      if (sem_post(&rw_mutex) == -1) {
-        printf("Error signalling for rw_mutex\n");
-        exit(2);
-      }
-    }
-
-    if (sem_post(&mutex) == -1) {
-      printf("Error signalling for mutex\n");
-      exit(2);
-    }
-  } while (1);
+  if (sem_post(&mutex) == -1) {
+    printf("Error signalling for mutex\n");
+    exit(2);
+  }
 }
 
 int main(int argc, char *argv[]) {
