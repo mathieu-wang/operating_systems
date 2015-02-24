@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
   }
 
   int i;
-  //Create NUM_READERS readers threads
+  //Create NUM_READERS reader threads
   for (i = 0; i < NUM_READERS; i++) {
     status = pthread_create(&readers[i], NULL, threadFunc, &loops);
     if (status != 0) {
@@ -57,8 +57,27 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  //Create NUM_WRITES writer threads
+  for (i = 0; i < NUM_WRITERS; i++) {
+    status = pthread_create(&writers[i], NULL, threadFunc, &loops);
+    if (status != 0) {
+      printf("Error, creating threads\n");
+      exit(1);
+    }
+  }
+
+  //Wait for reader threads
   for(i = 0; i < NUM_READERS; i++) {
     status = pthread_join(readers[i], NULL);
+    if (status != 0) {
+      printf("Error, creating threads\n");
+      exit(1);
+    }
+  }
+
+  //Wait for writer threads
+  for(i = 0; i < NUM_WRITERS; i++) {
+    status = pthread_join(writers[i], NULL);
     if (status != 0) {
       printf("Error, creating threads\n");
       exit(1);
