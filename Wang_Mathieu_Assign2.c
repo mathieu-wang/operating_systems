@@ -2,16 +2,18 @@
 #include <stdio.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <sys/time.h>
 
 #define NUM_READERS 100
 #define NUM_WRITERS 10
 
 static int target = 0;
-static sem_t sem;
+static sem_t rw_mutex;
+static sem_t mutex;
+int read_count = 0;
 
-
+/*
 static void *threadFunc(void *arg) {
-
   int loops = *((int *) arg);
   int loc, j;
 
@@ -29,8 +31,69 @@ static void *threadFunc(void *arg) {
   }
   return NULL;
 }
+*/
 
+static void *writeThreadFunc(void *arg) {
+  do {
+    if (sem_wait(&rw_mutex) == -1) {
+      printf("Error waiting for rw_mutex\n");
+      exit(2);
+    }
 
+    //critical section
+    target += 10;
+    printf("Target: %d\n", target);
+    //end critical section
+
+    if (sem_post(&rw_mutex) == -1) {
+      printf("Error signalling for rw_mutex\n");
+      exit(2);
+    }
+  } while (1);
+}
+
+static void *readThreadFunc(void *arg) {
+  do {
+    if (sem_wait(&mutex) == -1) {
+      printf("Error waiting for mutex\n");
+      exit(2);
+    }
+    read_count++;
+    if (read_count == 1) {
+      if (sem_wait(&rw_mutex) == -1) {
+        printf("Error waiting for rw_mutex\n");
+        exit(2);
+      }
+    }
+    if (sem_post(&mutex) == -1) {
+      printf("Error signalling for mutex\n");
+      exit(2);
+    }
+
+    //critical section
+    int local = target;
+    printf("Got target: %d\n", local);
+    printf("read_count: %d\n", read_count);
+    //end critical section
+
+    if (sem_wait(&mutex) == -1) {
+      printf("Error waiting for mutex\n");
+      exit(2);
+    }
+    read_count--;
+    if (read_count == 0) {
+      if (sem_post(&rw_mutex) == -1) {
+        printf("Error signalling for rw_mutex\n");
+        exit(2);
+      }
+    }
+
+    if (sem_post(&mutex) == -1) {
+      printf("Error signalling for mutex\n");
+      exit(2);
+    }
+  } while (1);
+}
 
 int main(int argc, char *argv[]) {
 
@@ -40,17 +103,22 @@ int main(int argc, char *argv[]) {
 
   int status;
 
-  int loops = 100000;
+  int loops = 1;
 
-  if (sem_init(&sem, 0, 1) == -1) {
-    printf("Error, init semaphore\n");
+  if (sem_init(&rw_mutex, 0, 1) == -1) {
+    printf("Error init rw_mutex\n");
+    exit(1);
+  }
+
+  if (sem_init(&mutex, 0, 1) == -1) {
+    printf("Error init mutex\n");
     exit(1);
   }
 
   int i;
   //Create NUM_READERS reader threads
   for (i = 0; i < NUM_READERS; i++) {
-    status = pthread_create(&readers[i], NULL, threadFunc, &loops);
+    status = pthread_create(&readers[i], NULL, readThreadFunc, &loops);
     if (status != 0) {
       printf("Error, creating threads\n");
       exit(1);
@@ -59,7 +127,7 @@ int main(int argc, char *argv[]) {
 
   //Create NUM_WRITES writer threads
   for (i = 0; i < NUM_WRITERS; i++) {
-    status = pthread_create(&writers[i], NULL, threadFunc, &loops);
+    status = pthread_create(&writers[i], NULL, writeThreadFunc, &loops);
     if (status != 0) {
       printf("Error, creating threads\n");
       exit(1);
