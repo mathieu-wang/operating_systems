@@ -78,7 +78,19 @@ int main(int argc, char *argv[]) {
 
   int status;
 
-  int loops = 1;
+  if (argc != 2) {
+    printf("Provide the number of loops as the only argument.\n");
+    exit(1);
+  }
+  int loops;
+
+  if (sscanf(argv[1], "%i", &loops) != 1) {
+    printf("Argument not an integer.\n");
+    exit(1);
+  }
+
+  //int loops = atoi(argv[1]);
+  printf("Loops: %d\n", loops);
 
   if (sem_init(&rw_mutex, 0, 1) == -1) {
     printf("Error init rw_mutex\n");
