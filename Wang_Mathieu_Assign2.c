@@ -13,6 +13,16 @@ static sem_t mutex;
 int read_count = 0;
 
 static void *writeThreadFunc(void *arg) {
+  struct timeval tvBegin, tvEnd;
+  gettimeofday(&tvBegin, NULL);
+
+  nanosleep((struct timespec[]){{0, 100000000}}, NULL);
+
+  gettimeofday(&tvEnd, NULL);
+
+  double elapsed = (tvEnd.tv_sec - tvBegin.tv_sec)*1000 + (tvEnd.tv_usec - tvBegin.tv_usec)/1000.0;
+  printf("Time elapsed : %f\n", elapsed);
+
   if (sem_wait(&rw_mutex) == -1) {
     printf("Error waiting for rw_mutex\n");
     exit(2);
