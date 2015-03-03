@@ -12,17 +12,30 @@ static sem_t rw_mutex;
 static sem_t mutex;
 int read_count = 0;
 
+void sleep() {
+  int sleepTime = rand() % 100; //generate random number between 0 and 100
+  printf("Sleep value: %d\n", sleepTime);
+  nanosleep((struct timespec[]){{0, sleepTime*1000000}}, NULL);
+  //usleep(sleepTime*1000);
+}
+
 static void *writeThreadFunc(void *arg) {
   struct timeval tvBegin, tvEnd;
   gettimeofday(&tvBegin, NULL);
+  printf("TIME START: %f %f\n", (double)tvBegin.tv_sec, (double)tvBegin.tv_usec);
 
-  nanosleep((struct timespec[]){{0, 100000000}}, NULL);
+  sleep();
 
   gettimeofday(&tvEnd, NULL);
+  printf("TIME END: %f %f\n", (double)tvEnd.tv_sec, (double)tvEnd.tv_usec);
 
-  double elapsed = (tvEnd.tv_sec - tvBegin.tv_sec)*1000 + (tvEnd.tv_usec - tvBegin.tv_usec)/1000.0;
-  printf("Time elapsed : %f\n", elapsed);
+  double elapsedInMillis = (tvEnd.tv_sec - tvBegin.tv_sec)*1000 + (tvEnd.tv_usec - tvBegin.tv_usec)/1000.0;
+  printf("Time elapsed: %f %f %f ms\n", (double)(tvEnd.tv_sec - tvBegin.tv_sec)*1000, (double)(tvEnd.tv_usec - tvBegin.tv_usec)/1000.0, elapsedInMillis);
 
+  int i;
+  for (i = 0; i < *(int*)arg; i++) {
+    // printf("current loop value: %d\n", i);
+  }
   if (sem_wait(&rw_mutex) == -1) {
     printf("Error waiting for rw_mutex\n");
     exit(2);
@@ -99,8 +112,9 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  //int loops = atoi(argv[1]);
   printf("Loops: %d\n", loops);
+
+  srand(time(NULL)); //initialized random
 
   if (sem_init(&rw_mutex, 0, 1) == -1) {
     printf("Error init rw_mutex\n");
