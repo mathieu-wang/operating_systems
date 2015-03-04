@@ -55,7 +55,7 @@ static void *writeThreadFunc(void *arg) {
     }
     sleep();
   }
-  printf("Total thread wait time: %f us\n", totalThreadWaitTimeInMicros);
+  // printf("Total thread wait time: %f us\n", totalThreadWaitTimeInMicros);
   if (totalThreadWaitTimeInMicros < minWriteWait) {
     minWriteWait = totalThreadWaitTimeInMicros;
   } else if (totalThreadWaitTimeInMicros > maxWriteWait) {
@@ -65,44 +65,76 @@ static void *writeThreadFunc(void *arg) {
 }
 
 static void *readThreadFunc(void *arg) {
-  if (sem_wait(&mutex) == -1) {
-    printf("Error waiting for mutex\n");
-    exit(2);
-  }
-  read_count++;
-  if (read_count == 1) {
-    if (sem_wait(&rw_mutex) == -1) {
-      printf("Error waiting for rw_mutex\n");
+  int i = 0;
+  int numLoops = *(int*)arg;
+  double totalThreadWaitTimeInMicros = 0;
+
+  for(i = 0; i < numLoops; i++) {
+    struct timeval tvBegin, tvEnd;
+
+    gettimeofday(&tvBegin, NULL);
+    if (sem_wait(&mutex) == -1) {
+      printf("Error waiting for mutex\n");
+      exit(2);
+    }
+    gettimeofday(&tvEnd, NULL);
+
+    //measure time waited for mutex
+    double iterationWaitTimeInMicros = (tvEnd.tv_sec - tvBegin.tv_sec)*1000000 + (tvEnd.tv_usec - tvBegin.tv_usec);
+    totalThreadWaitTimeInMicros += iterationWaitTimeInMicros;
+
+    read_count++;
+    if (read_count == 1) { //first reader thread, so need to get rw_mutex
+      gettimeofday(&tvBegin, NULL);
+      if (sem_wait(&rw_mutex) == -1) {
+        printf("Error waiting for rw_mutex\n");
+        exit(2);
+      }
+      gettimeofday(&tvEnd, NULL);
+      //measure time waited for rw_mutex
+      iterationWaitTimeInMicros = (tvEnd.tv_sec - tvBegin.tv_sec)*1000000 + (tvEnd.tv_usec - tvBegin.tv_usec);
+      totalThreadWaitTimeInMicros += iterationWaitTimeInMicros;
+    }
+    if (sem_post(&mutex) == -1) {
+      printf("Error signalling for mutex\n");
+      exit(2);
+    }
+
+    //critical section
+    int local = target;
+    printf("Got target: %d\n", local);
+    //printf("read_count: %d\n", read_count);
+    //end critical section
+
+    gettimeofday(&tvBegin, NULL);
+    if (sem_wait(&mutex) == -1) {
+      printf("Error waiting for mutex\n");
+      exit(2);
+    }
+    gettimeofday(&tvEnd, NULL);
+    //measure time waited for mutex
+    iterationWaitTimeInMicros = (tvEnd.tv_sec - tvBegin.tv_sec)*1000000 + (tvEnd.tv_usec - tvBegin.tv_usec);
+    totalThreadWaitTimeInMicros += iterationWaitTimeInMicros;
+
+    read_count--;
+    if (read_count == 0) {
+      if (sem_post(&rw_mutex) == -1) {
+        printf("Error signalling for rw_mutex\n");
+        exit(2);
+      }
+    }
+
+    if (sem_post(&mutex) == -1) {
+      printf("Error signalling for mutex\n");
       exit(2);
     }
   }
-  if (sem_post(&mutex) == -1) {
-    printf("Error signalling for mutex\n");
-    exit(2);
+  if (totalThreadWaitTimeInMicros < minReadWait) {
+    minReadWait = totalThreadWaitTimeInMicros;
+  } else if (totalThreadWaitTimeInMicros > maxReadWait) {
+    maxReadWait = totalThreadWaitTimeInMicros;
   }
-
-  //critical section
-  int local = target;
-  printf("Got target: %d\n", local);
-  printf("read_count: %d\n", read_count);
-  //end critical section
-
-  if (sem_wait(&mutex) == -1) {
-    printf("Error waiting for mutex\n");
-    exit(2);
-  }
-  read_count--;
-  if (read_count == 0) {
-    if (sem_post(&rw_mutex) == -1) {
-      printf("Error signalling for rw_mutex\n");
-      exit(2);
-    }
-  }
-
-  if (sem_post(&mutex) == -1) {
-    printf("Error signalling for mutex\n");
-    exit(2);
-  }
+  totalReadWait += totalThreadWaitTimeInMicros;
 }
 
 int main(int argc, char *argv[]) {
@@ -175,7 +207,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  printf("target value %d \n", target);
+  printf("\nFinal target value %d \n", target);
 
   printf("Maximum Writer Wait Time: %f us\n", maxWriteWait);
   printf("Minimum Writer Wait Time: %f us\n", minWriteWait);
@@ -183,6 +215,6 @@ int main(int argc, char *argv[]) {
   printf("Maximum Reader Wait Time: %f us\n", maxReadWait);
   printf("Minimum Reader Wait Time: %f us\n", minReadWait);
   printf("Average Reader Wait Time: %f us\n", totalReadWait/NUM_READERS);
-  
+
   exit(0);
 }
