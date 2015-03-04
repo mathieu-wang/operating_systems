@@ -8,48 +8,60 @@
 #define NUM_WRITERS 10
 
 static int target = 0;
+static double maxWriteWait = 0;
+static double maxReadWait = 0;
+static double minWriteWait = 500000;
+static double minReadWait = 500000;
+static double totalReadWait = 0;
+static double totalWriteWait = 0;
 static sem_t rw_mutex;
 static sem_t mutex;
 int read_count = 0;
 
 void sleep() {
   int sleepTime = rand() % 100; //generate random number between 0 and 100
-  printf("Sleep value: %d\n", sleepTime);
   nanosleep((struct timespec[]){{0, sleepTime*1000000}}, NULL);
-  //usleep(sleepTime*1000);
 }
 
 static void *writeThreadFunc(void *arg) {
-  struct timeval tvBegin, tvEnd;
-  gettimeofday(&tvBegin, NULL);
-  printf("TIME START: %f %f\n", (double)tvBegin.tv_sec, (double)tvBegin.tv_usec);
+  int i = 0;
+  int numLoops = *(int*)arg;
+  double totalThreadWaitTimeInMicros = 0;
 
-  sleep();
+  for(i = 0; i < numLoops; i++) {
+    struct timeval tvBegin, tvEnd;
+    gettimeofday(&tvBegin, NULL);
 
-  gettimeofday(&tvEnd, NULL);
-  printf("TIME END: %f %f\n", (double)tvEnd.tv_sec, (double)tvEnd.tv_usec);
+    if (sem_wait(&rw_mutex) == -1) {
+      printf("Error waiting for rw_mutex\n");
+      exit(2);
+    }
 
-  double elapsedInMillis = (tvEnd.tv_sec - tvBegin.tv_sec)*1000 + (tvEnd.tv_usec - tvBegin.tv_usec)/1000.0;
-  printf("Time elapsed: %f %f %f ms\n", (double)(tvEnd.tv_sec - tvBegin.tv_sec)*1000, (double)(tvEnd.tv_usec - tvBegin.tv_usec)/1000.0, elapsedInMillis);
+    gettimeofday(&tvEnd, NULL);
 
-  int i;
-  for (i = 0; i < *(int*)arg; i++) {
-    // printf("current loop value: %d\n", i);
+    double iterationWaitTimeInMicros = (tvEnd.tv_sec - tvBegin.tv_sec)*1000000 + (tvEnd.tv_usec - tvBegin.tv_usec);
+    totalThreadWaitTimeInMicros += iterationWaitTimeInMicros;
+
+    //printf("Wait time: %f us\n", iterationWaitTimeInMicros);
+
+    //critical section
+    target += 10;
+    printf("Target: %d\n", target);
+    //end critical section
+
+    if (sem_post(&rw_mutex) == -1) {
+      printf("Error signalling for rw_mutex\n");
+      exit(2);
+    }
+    sleep();
   }
-  if (sem_wait(&rw_mutex) == -1) {
-    printf("Error waiting for rw_mutex\n");
-    exit(2);
+  printf("Total thread wait time: %f us\n", totalThreadWaitTimeInMicros);
+  if (totalThreadWaitTimeInMicros < minWriteWait) {
+    minWriteWait = totalThreadWaitTimeInMicros;
+  } else if (totalThreadWaitTimeInMicros > maxWriteWait) {
+    maxWriteWait = totalThreadWaitTimeInMicros;
   }
-
-  //critical section
-  target += 10;
-  printf("Target: %d\n", target);
-  //end critical section
-
-  if (sem_post(&rw_mutex) == -1) {
-    printf("Error signalling for rw_mutex\n");
-    exit(2);
-  }
+  totalWriteWait += totalThreadWaitTimeInMicros;
 }
 
 static void *readThreadFunc(void *arg) {
@@ -164,5 +176,13 @@ int main(int argc, char *argv[]) {
   }
 
   printf("target value %d \n", target);
+
+  printf("Maximum Writer Wait Time: %f us\n", maxWriteWait);
+  printf("Minimum Writer Wait Time: %f us\n", minWriteWait);
+  printf("Average Writer Wait Time: %f us\n", totalWriteWait/NUM_WRITERS);
+  printf("Maximum Reader Wait Time: %f us\n", maxReadWait);
+  printf("Minimum Reader Wait Time: %f us\n", minReadWait);
+  printf("Average Reader Wait Time: %f us\n", totalReadWait/NUM_READERS);
+  
   exit(0);
 }
