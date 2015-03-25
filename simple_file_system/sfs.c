@@ -1,10 +1,14 @@
 #include "sfs_api.h"
 #include "disk_emu.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define MAGIC_NUMBER 0xAABB0005
 #define BLOCK_SIZE 512
 #define NUM_BLOCKS 1000
 #define NUM_INODES 100
+#define ROOT_DIR_IND 0
 
 //inode modes
 #define FILE 0
@@ -17,14 +21,17 @@
 #define MAX_NUM_FILES 150
 #define OPEN_FILES_LIMIT 150
 
+#define FREE 0
+#define NOT_FREE 1
+
 //Struct and list definitions
 typedef struct superBlock {
 	//use long for everything because need minimum 4 bytes long
-	long magicNumber;// = MAGIC_NUMBER;
-	long blockSize;// = BLOCK_SIZE;
-	long fsSize;// = NUM_BLOCKS;
-	long inodeTableLength;// = NUM_INODES;
-	long rootDir;
+	long magicNumber;
+	long blockSize;
+	long fsSize;
+	long inodeTableLength;
+	long rootDirIndex;
 	long unused;
 } superBlock;
 
@@ -38,9 +45,49 @@ typedef struct inode {
 	int blockPtrs[12];
 } inode;
 
+inode* inodeTable[NUM_INODES];
+
+inode* rootDir;
+superBlock sb = {MAGIC_NUMBER, BLOCK_SIZE, NUM_BLOCKS, NUM_INODES, ROOT_DIR_IND, 0};
+
+int freeBlockList[NUM_BLOCKS];
+
+
+void initFreeBlockList() {
+	int i;
+	for (i = 0; i < NUM_BLOCKS; i++) {
+		freeBlockList[i] = FREE;
+	}
+	freeBlockList[0] = NOT_FREE;
+	freeBlockList[1] = NOT_FREE;
+	freeBlockList[NUM_BLOCKS-1] = NOT_FREE;
+}
+
+
+void initInodeTable() {
+	int i;
+	for (i = 0; i < NUM_INODES; i++) {
+		inodeTable[i] = (inode*)malloc(sizeof(inode));
+	}
+	rootDir = inodeTable[ROOT_DIR_IND];
+	rootDir -> mode = DIR;
+	rootDir -> size = MAX_NUM_FILES; //?
+	rootDir -> blockCount = 1; //?
+	rootDir -> uid = DEFAULT_UID;
+	rootDir -> gid = DEFAULT_GID;
+	//TODO: initialize blockPtrs?
+}
+
 int mksfs(int fresh){
-	char* disk_name = "Disk";
-	return 0;
+	char* diskName = "Disk";
+	if (fresh) {
+		init_fresh_disk(diskName, BLOCK_SIZE, NUM_BLOCKS);
+
+		initFreeBlockList();
+		initInodeTable();
+
+		return 0;
+	}
 }
 int sfs_fopen(char *name) {
 	return 0;
