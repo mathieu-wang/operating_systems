@@ -35,6 +35,9 @@ typedef struct superBlock {
 	long unused;
 } superBlock;
 
+superBlock sb = {MAGIC_NUMBER, BLOCK_SIZE, NUM_BLOCKS, NUM_INODES, ROOT_DIR_IND, 0};
+
+
 // does not implement atime, ctime, mtime, access mode and indirect blocks
 typedef struct inode {
 	int mode;
@@ -48,7 +51,6 @@ typedef struct inode {
 inode* inodeTable[NUM_INODES];
 
 inode* rootDir;
-superBlock sb = {MAGIC_NUMBER, BLOCK_SIZE, NUM_BLOCKS, NUM_INODES, ROOT_DIR_IND, 0};
 
 int freeBlockList[NUM_BLOCKS];
 
@@ -78,6 +80,15 @@ void initInodeTable() {
 	//TODO: initialize blockPtrs?
 }
 
+void writeToDisk() {
+	write_blocks(0, 1, (void*)&sb);
+	int i;
+	for (i = 1; i < NUM_INODES; i++) {
+		write_blocks(i, NUM_INODES,(void*)inodeTable[i]); //one inode per block
+	}
+	write_blocks(NUM_BLOCKS-1,1,(void*)&freeBlockList);
+}
+
 int mksfs(int fresh){
 	char* diskName = "Disk";
 	if (fresh) {
@@ -86,7 +97,11 @@ int mksfs(int fresh){
 		initFreeBlockList();
 		initInodeTable();
 
+		writeToDisk();
+
 		return 0;
+	} else {
+		//TODO
 	}
 }
 int sfs_fopen(char *name) {
