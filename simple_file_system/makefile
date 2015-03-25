@@ -11,4 +11,4 @@ disk_emu.o : disk_emu.c
 	gcc -c disk_emu.c
 
 clean : 
-	rm -rf *.o
+	rm -rf *.o sfs_test

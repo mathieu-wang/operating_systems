@@ -48,45 +48,70 @@ typedef struct inode {
 	int blockPtrs[12];
 } inode;
 
+typedef struct rootDirEntry {
+	char fname[MAX_FNAME_LENGTH];
+	int inode_index;
+} rootDirEntry;
+
+rootDirEntry* rootDir[MAX_NUM_FILES];
+
 inode* inodeTable[NUM_INODES];
 
-inode* rootDir;
+inode* rootDirInode;
 
 int freeBlockList[NUM_BLOCKS];
 
+typedef struct fdtEntry
+{
+	char fname[MAX_FNAME_LENGTH];
+	int inodeIndex;
+	int writePtr;
+	int readPtr;
+} fdtEntry;
+
+fdtEntry fdt[OPEN_FILES_LIMIT];
 
 void initFreeBlockList() {
 	int i;
-	for (i = 0; i < NUM_BLOCKS; i++) {
+	for (i = 0; i <= NUM_INODES + 1; i++) {
+		freeBlockList[i] = NOT_FREE;
+	}
+	for (i = 0; i < NUM_BLOCKS - 1; i++) {
 		freeBlockList[i] = FREE;
 	}
-	freeBlockList[0] = NOT_FREE;
-	freeBlockList[1] = NOT_FREE;
-	freeBlockList[NUM_BLOCKS-1] = NOT_FREE;
 }
 
+void initRootDirInode() {
+	rootDirInode = inodeTable[ROOT_DIR_IND];
+	rootDirInode -> mode = DIR;
+	rootDirInode -> size = MAX_NUM_FILES; //?
+	rootDirInode -> blockCount = 1; //?
+	rootDirInode -> uid = DEFAULT_UID;
+	rootDirInode -> gid = DEFAULT_GID;
+	rootDirInode -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table
+}
 
 void initInodeTable() {
 	int i;
 	for (i = 0; i < NUM_INODES; i++) {
 		inodeTable[i] = (inode*)malloc(sizeof(inode));
 	}
-	rootDir = inodeTable[ROOT_DIR_IND];
-	rootDir -> mode = DIR;
-	rootDir -> size = MAX_NUM_FILES; //?
-	rootDir -> blockCount = 1; //?
-	rootDir -> uid = DEFAULT_UID;
-	rootDir -> gid = DEFAULT_GID;
-	//TODO: initialize blockPtrs?
+	initRootDirInode();
 }
 
 void writeToDisk() {
 	write_blocks(0, 1, (void*)&sb);
 	int i;
 	for (i = 1; i < NUM_INODES; i++) {
-		write_blocks(i, NUM_INODES,(void*)inodeTable[i]); //one inode per block
+		write_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
-	write_blocks(NUM_BLOCKS-1,1,(void*)&freeBlockList);
+	write_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
+
+	//One block for inode table
+	// write_blocks(1, 1, (void*)inodeTable);
+	// write_blocks(2, 1, (void*)rootDir);
+
+	write_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
 }
 
 int mksfs(int fresh){
