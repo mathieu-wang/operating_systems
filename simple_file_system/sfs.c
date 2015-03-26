@@ -23,6 +23,7 @@
 
 #define FREE 0
 #define NOT_FREE 1
+#define FULL -1
 
 //Struct and list definitions
 typedef struct superBlock {
@@ -36,7 +37,6 @@ typedef struct superBlock {
 } superBlock;
 
 superBlock sb = {MAGIC_NUMBER, BLOCK_SIZE, NUM_BLOCKS, NUM_INODES, ROOT_DIR_IND, 0};
-
 
 // does not implement atime, ctime, mtime, access mode and indirect blocks
 typedef struct inode {
@@ -61,12 +61,10 @@ inode* rootDirInode;
 
 int freeBlockList[NUM_BLOCKS];
 
-typedef struct fdtEntry
-{
+typedef struct fdtEntry {
 	char fname[MAX_FNAME_LENGTH];
 	int inodeIndex;
-	int writePtr;
-	int readPtr;
+	int rwPtr;
 } fdtEntry;
 
 fdtEntry fdt[OPEN_FILES_LIMIT];
@@ -84,11 +82,11 @@ void initFreeBlockList() {
 void initRootDirInode() {
 	rootDirInode = inodeTable[ROOT_DIR_IND];
 	rootDirInode -> mode = DIR;
-	rootDirInode -> size = MAX_NUM_FILES; //?
-	rootDirInode -> blockCount = 1; //?
+	rootDirInode -> size = MAX_NUM_FILES;
+	rootDirInode -> blockCount = 1;
 	rootDirInode -> uid = DEFAULT_UID;
 	rootDirInode -> gid = DEFAULT_GID;
-	rootDirInode -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table
+	rootDirInode -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table to store root directory data
 }
 
 void initInodeTable() {
@@ -106,12 +104,17 @@ void writeToDisk() {
 		write_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
 	write_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
-
-	//One block for inode table
-	// write_blocks(1, 1, (void*)inodeTable);
-	// write_blocks(2, 1, (void*)rootDir);
-
 	write_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
+}
+
+int getFirstFreeBlock() {
+	int i;
+	for (i = 0; i < NUM_BLOCKS;i++) {
+		if (freeBlockList[i] == FREE) {
+			return i;
+		}
+	}
+	return FULL;
 }
 
 int mksfs(int fresh){
