@@ -107,6 +107,16 @@ void writeToDisk() {
 	write_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
 }
 
+void readFromDisk() {
+	read_blocks(0, 1, (void*)&sb);
+	int i;
+	for (i = 1; i < NUM_INODES; i++) {
+		read_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
+	}
+	read_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
+	read_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
+}
+
 int getFirstFreeBlock() {
 	int i;
 	for (i = 0; i < NUM_BLOCKS;i++) {
@@ -117,19 +127,35 @@ int getFirstFreeBlock() {
 	return FULL;
 }
 
+void initFDT() {
+	int i;
+	for (i = 0; i < OPEN_FILES_LIMIT; i++) {
+		fdt[i].inodeIndex = -1;
+		fdt[i].rwPtr = -1;
+	}
+}
+
 int mksfs(int fresh){
 	char* diskName = "Disk";
 	if (fresh) {
-		init_fresh_disk(diskName, BLOCK_SIZE, NUM_BLOCKS);
+		if (init_fresh_disk(diskName, BLOCK_SIZE, NUM_BLOCKS) == -1)
+			return -1;
 
-		initFreeBlockList();
 		initInodeTable();
-
+		initFreeBlockList();
 		writeToDisk();
+
+		initFDT();
 
 		return 0;
 	} else {
-		//TODO
+		if (init_disk(diskName, BLOCK_SIZE, NUM_BLOCKS) == -1)
+			return -1;
+
+		readFromDisk();
+		initFDT();
+
+		return 0;
 	}
 }
 int sfs_fopen(char *name) {
