@@ -48,7 +48,7 @@ char *rand_name()
   int i;
 
   for (i = 0; i < MAX_FNAME_LENGTH; i++) {
-    if (i != 8) {
+    if (i != 16) {
       fname[i] = 'A' + (rand() % 26);
     }
     else {
@@ -154,7 +154,10 @@ main(int argc, char **argv)
   }
 
   fds[1] = sfs_fopen(names[1]);
-
+  
+  sfs_fseek(0, 0);
+  sfs_fseek(1, 0);
+  
   for (i = 0; i < 2; i++) {
     for (j = 0; j < filesize[i]; j += chunksize) {
       if ((filesize[i] - j) < 10) {
@@ -168,6 +171,7 @@ main(int argc, char **argv)
         exit(-1);
       }
       readsize = sfs_fread(fds[i], buffer, chunksize);
+
       if (readsize != chunksize) {
         fprintf(stderr, "ERROR: Requested %d bytes, read %d\n", chunksize, readsize);
         readsize = chunksize;
@@ -249,6 +253,10 @@ main(int argc, char **argv)
 
   /* Now test the file contents.
    */
+  for (i = 0; i < nopen; i++) {
+      sfs_fseek(fds[i], 0);
+  }
+
   for (j = 0; j < strlen(test_str); j++) {
     for (i = 0; i < nopen; i++) {
       char ch;
@@ -281,6 +289,7 @@ main(int argc, char **argv)
 
   for (i = 0; i < nopen; i++) {
     fds[i] = sfs_fopen(names[i]);
+    sfs_fseek(fds[i], 0);
     if (fds[i] >= 0) {
       readsize = sfs_fread(fds[i], fixedbuf, sizeof(fixedbuf));
       if (readsize != strlen(test_str)) {
@@ -292,6 +301,7 @@ main(int argc, char **argv)
         if (test_str[j] != fixedbuf[j]) {
           fprintf(stderr, "ERROR: Wrong byte in %s at %d (%d,%d)\n", 
                   names[i], j, fixedbuf[j], test_str[j]);
+          printf("%d\n", fixedbuf[1]);
           error_count++;
           break;
         }
@@ -342,6 +352,7 @@ main(int argc, char **argv)
    */
   for (i = 0; i < nopen; i++) {
     fds[i] = sfs_fopen(names[i]);
+    sfs_fseek(fds[i], 0);
     if (fds[i] >= 0) {
       readsize = sfs_fread(fds[i], fixedbuf, sizeof(fixedbuf));
       if (readsize < strlen(test_str)) {
@@ -368,23 +379,3 @@ main(int argc, char **argv)
   fprintf(stderr, "Test program exiting with %d errors\n", error_count);
   return (error_count);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
