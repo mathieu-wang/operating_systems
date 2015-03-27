@@ -25,6 +25,10 @@
 #define NOT_FREE 1
 #define FULL -1
 
+#define FILE_NOT_OPEN -1
+#define FILE_DNE -2
+#define OPEN_FILES_LIMIT_REACHED -3
+
 //Struct and list definitions
 typedef struct superBlock {
 	//use long for everything because need minimum 4 bytes long
@@ -63,6 +67,7 @@ int freeBlockList[NUM_BLOCKS];
 
 typedef struct fdtEntry {
 	char fname[MAX_FNAME_LENGTH];
+	int hasFile;
 	int inodeIndex;
 	int rwPtr;
 } fdtEntry;
@@ -130,6 +135,7 @@ int getFirstFreeBlock() {
 void initFDT() {
 	int i;
 	for (i = 0; i < OPEN_FILES_LIMIT; i++) {
+		fdt[i].hasFile = 0;
 		fdt[i].inodeIndex = -1;
 		fdt[i].rwPtr = -1;
 	}
@@ -158,9 +164,66 @@ int mksfs(int fresh){
 		return 0;
 	}
 }
-int sfs_fopen(char *name) {
-	return 0;
+
+//checks whether a file is open, i.e., exists in FDT.
+//returns the index of file in FDT if open, FILE_DNE otherwise.
+int isOpen(char* name) {
+	int i;
+	for (i = 0; i < OPEN_FILES_LIMIT; i++) {
+		if (fdt[i].hasFile == 1) {
+			if(strcmp(fdt[i].fname, name)==0) {
+				return i;
+			}
+		}	
+	}
+	return FILE_NOT_OPEN;
 }
+
+int getFileInodeIndex(char* name) {
+	int i;
+	for (i = 0; i < MAX_NUM_FILES; i++) {
+		if (strcmp(rootDir[i]->fname, name) == 0) {
+			return rootDir[i]->inodeIndex;
+		}
+	}
+}
+
+int getFirstFreeFdtEntry() {
+	int i;
+	for(i = 0; j < OPEN_FILES_LIMIT; i++) {
+		if(fdt[i].hasFile != 1)	{
+			return i;
+		}
+	}
+	return OPEN_FILES_LIMIT_REACHED;
+}
+
+int sfs_fopen(char *name) {
+	int isOpen = isOpen(name);
+
+	if (isOpen != FILE_NOT_OPEN) {
+		printf("File already open..\n");
+		return isOpen;
+	}
+
+	// check if file exists
+	int fileInodeInd = getFileInodeIndex(name);
+
+	if (fileInodeInd == FILE_DNE) { // file doesn not exist --> create file
+		//TODO
+	} else { // file exists --> open
+		int fdIndex = getFirstFreeFdtEntry();
+		if (fdIndex < 0) {
+			return fdIndex //OPEN_FILE_LIMIT_REACHED
+		} else {
+			fdt[fdIndex].hasFile = 1;
+			fdt[fdIndex].inodeIndex = fileInodeInd;
+			//TODO set rwPtr?
+		}
+
+	}
+}
+
 int sfs_fclose(int fileID) {
 	return 0;
 }
