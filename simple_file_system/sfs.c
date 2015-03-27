@@ -87,26 +87,19 @@ void initFreeBlockList() {
 void initRootDirInode() {
 	rootDirInode = inodeTable[ROOT_DIR_IND];
 	rootDirInode -> mode = DIR;
-	rootDirInode -> size = MAX_NUM_FILES;
+	rootDirInode -> size = 0;
 	rootDirInode -> blockCount = 1;
 	rootDirInode -> uid = DEFAULT_UID;
 	rootDirInode -> gid = DEFAULT_GID;
 	rootDirInode -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table to store root directory data
 }
 
-void initInodeTable() {
-	int i;
-	for (i = 0; i < NUM_INODES; i++) {
-		inodeTable[i] = (inode*)malloc(sizeof(inode));
-	}
-	initRootDirInode();
-}
-
 void writeToDisk() {
 	write_blocks(0, 1, (void*)&sb);
 	int i;
 	for (i = 1; i < NUM_INODES; i++) {
-		write_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
+		if (inodeTable[i] != NULL)
+			write_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
 	write_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
 	write_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
@@ -147,7 +140,7 @@ int mksfs(int fresh){
 		if (init_fresh_disk(diskName, BLOCK_SIZE, NUM_BLOCKS) == -1)
 			return -1;
 
-		initInodeTable();
+		initRootDirInode();
 		initFreeBlockList();
 		writeToDisk();
 
@@ -198,6 +191,24 @@ int getFirstFreeFdtEntry() {
 	return OPEN_FILES_LIMIT_REACHED;
 }
 
+int createInode() {
+	int i;
+	for (i = 0; i < NUM_INODES; i++) {
+		if (inodeTable[i] == NULL) {
+			inodeTable[i] -> mode = FILE;
+			inodeTable[i] -> size = 0;
+			inodeTable[i] -> blockCount = 0;
+			inodeTable[i] -> uid = DEFAULT_UID;
+			inodeTable[i] -> gid = DEFAULT_GID;
+			inodeTable[i] -> blockPtrs[0] = NUM_INODES + 1;
+		}
+	}
+}
+
+int createFileInRootDir() {
+
+}
+
 int sfs_fopen(char *name) {
 	int isOpen = isOpen(name);
 
@@ -210,7 +221,7 @@ int sfs_fopen(char *name) {
 	int fileInodeInd = getFileInodeIndex(name);
 
 	if (fileInodeInd == FILE_DNE) { // file doesn not exist --> create file
-		//TODO
+		//TODO create file
 	} else { // file exists --> open
 		int fdIndex = getFirstFreeFdtEntry();
 		if (fdIndex < 0) {
