@@ -88,14 +88,13 @@ void initFreeBlockList() {
 }
 
 void initRootDirInode() {
-	rootDirInode = inodeTable[ROOT_DIR_IND];
-	rootDirInode = (inode*)malloc(sizeof(inode));
-	rootDirInode -> mode = DIR;
-	rootDirInode -> size = 0;
-	rootDirInode -> blockCount = 1;
-	rootDirInode -> uid = DEFAULT_UID;
-	rootDirInode -> gid = DEFAULT_GID;
-	rootDirInode -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table to store root directory data
+	inodeTable[ROOT_DIR_IND] = (inode*)malloc(sizeof(inode));
+	inodeTable[ROOT_DIR_IND] -> mode = DIR;
+	inodeTable[ROOT_DIR_IND] -> size = 0;
+	inodeTable[ROOT_DIR_IND] -> blockCount = 1;
+	inodeTable[ROOT_DIR_IND] -> uid = DEFAULT_UID;
+	inodeTable[ROOT_DIR_IND] -> gid = DEFAULT_GID;
+	inodeTable[ROOT_DIR_IND] -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table to store root directory data
 }
 
 void writeToDisk() {
@@ -105,7 +104,9 @@ void writeToDisk() {
 		if (inodeTable[i] != NULL)
 			write_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
-	write_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
+	int rootDirBlockCount = inodeTable[ROOT_DIR_IND]->blockCount;
+	int rootDirBlockPtrStart = inodeTable[ROOT_DIR_IND]->blockPtrs[0];
+	write_blocks(rootDirBlockPtrStart, rootDirBlockCount, (void*)rootDir); //first data block
 	write_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
 }
 
@@ -115,7 +116,9 @@ void readFromDisk() {
 	for (i = 1; i < NUM_INODES-2; i++) {
 		read_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
-	read_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
+	int rootDirBlockCount = inodeTable[ROOT_DIR_IND]->blockCount;
+	int rootDirBlockPtrStart = inodeTable[ROOT_DIR_IND]->blockPtrs[0];
+	read_blocks(rootDirBlockPtrStart, rootDirBlockCount, (void*)rootDir); //first data block
 	read_blocks(NUM_BLOCKS-1, 1, (void*)&freeBlockList);
 }
 
