@@ -129,12 +129,17 @@ int getFirstFreeBlock() {
 	return FULL;
 }
 
-void initFDT() {
+void initFdtEntry(int index) {
+	fdt[index].hasFile = 0;
+	fdt[index].inodeIndex = -1;
+	fdt[index].rwPtr = 0;
+	strcpy(fdt[index].fname, "");
+}
+
+void initFdt() {
 	int i;
 	for (i = 0; i < OPEN_FILES_LIMIT; i++) {
-		fdt[i].hasFile = 0;
-		fdt[i].inodeIndex = -1;
-		fdt[i].rwPtr = -1;
+		initFdtEntry(i);
 	}
 }
 
@@ -148,7 +153,7 @@ int mksfs(int fresh){
 		initFreeBlockList();
 		writeToDisk();
 
-		initFDT();
+		initFdt();
 
 		return 0;
 	} else {
@@ -156,7 +161,7 @@ int mksfs(int fresh){
 			return -1;
 
 		readFromDisk();
-		initFDT();
+		initFdt();
 
 		return 0;
 	}
@@ -258,6 +263,7 @@ int sfs_fopen(char *name) {
 			createFileInRootDir(name, inodeIndex);
 			fileInodeInd = inodeIndex;
 		}
+		writeToDisk();
 	}
 	// file now exists --> open
 	fdIndex = getFirstFreeFdtEntry();
@@ -271,7 +277,14 @@ int sfs_fopen(char *name) {
 	return fdIndex;
 }
 
-int sfs_fclose(int fileID) {
+int sfs_fclose(int fileIndex) {
+	// check if file is open
+	if (fdt[fileIndex].hasFile != 1) {
+		printf("File with index %d is not open..\n", fileIndex);
+		return -1;
+	}
+	initFdtEntry(fileIndex);
+	printFdt();
 	return 0;
 }
 int sfs_fwrite(int fileID, const char *buf, int length) {
