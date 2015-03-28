@@ -30,7 +30,7 @@
 #define OPEN_FILES_LIMIT_REACHED -3
 
 #define NO_MORE_FREE_INODE -1
-#define FILE_DIRECTORY_FULL -1
+#define ROOT_DIRECTORY_FULL -1
 
 //Struct and list definitions
 typedef struct superBlock {
@@ -56,7 +56,7 @@ typedef struct inode {
 } inode;
 
 typedef struct rootDirEntry {
-	char fname[MAX_FNAME_LENGTH];
+	char fname[MAX_FNAME_LENGTH+1];
 	int inodeIndex;
 } rootDirEntry;
 
@@ -69,7 +69,7 @@ inode* rootDirInode;
 int freeBlockList[NUM_BLOCKS];
 
 typedef struct fdtEntry {
-	char fname[MAX_FNAME_LENGTH];
+	char fname[MAX_FNAME_LENGTH+1];
 	int hasFile;
 	int inodeIndex;
 	int rwPtr;
@@ -173,6 +173,7 @@ int isOpen(char* name) {
 			}
 		}	
 	}
+	printf("File %s is not open\n", name);
 	return FILE_NOT_OPEN;
 }
 
@@ -222,10 +223,21 @@ int createFileInRootDir(char *name, int inodeIndex) {
 		if (rootDir[i] == NULL) {
 			rootDir[i] = (rootDirEntry*)malloc(sizeof(rootDirEntry));
 			strcpy(rootDir[i]->fname, name);
+			rootDir[i]->inodeIndex = inodeIndex;
 			return i;
 		}
 	}
-	return FILE_DIRECTORY_FULL;
+	return ROOT_DIRECTORY_FULL;
+}
+
+void printFdt() {
+	printf("\nFile Descriptor Table\n");
+	int i;
+	for(i = 0; i < OPEN_FILES_LIMIT; i++) {
+		if(fdt[i].hasFile == 1)	{
+			printf("index: %d, fname: %s, inodeIndex: %d, rwPtr: %d\n", i, fdt[i].fname, fdt[i].inodeIndex, fdt[i].rwPtr);
+		}
+	}
 }
 
 int sfs_fopen(char *name) {
@@ -241,21 +253,21 @@ int sfs_fopen(char *name) {
 	int fdIndex = -1;
 
 	if (fileInodeInd == FILE_DNE) { // file doesn not exist --> create file
-		//TODO create file
 		int inodeIndex = createInode();
 		if (inodeIndex != NO_MORE_FREE_INODE) {
-			fdIndex = createFileInRootDir(name, inodeIndex);
-		}
-		return fdIndex;
-
-	} else { // file exists --> open
-		int fdIndex = getFirstFreeFdtEntry();
-		if (fdIndex >= 0) {
-			fdt[fdIndex].hasFile = 1;
-			fdt[fdIndex].inodeIndex = fileInodeInd;
+			createFileInRootDir(name, inodeIndex);
+			fileInodeInd = inodeIndex;
 		}
 	}
+	// file now exists --> open
+	fdIndex = getFirstFreeFdtEntry();
+	if (fdIndex >= 0) {
+		strcpy(fdt[fdIndex].fname, name);
+		fdt[fdIndex].hasFile = 1;
+		fdt[fdIndex].inodeIndex = fileInodeInd;
+	}
 
+	printFdt();
 	return fdIndex;
 }
 
