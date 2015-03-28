@@ -341,6 +341,24 @@ int sfs_fread(int fileID, char *buf, int length) {
 	return 0;
 }
 int sfs_fseek(int fileID, int offset) {
+	if (fdt[fileID].hasFile != 1) {
+		printf("Cannot seek: file with id %d is not open\n",fileID);
+		return -1;
+	}
+
+	if (offset < 0)	{
+		printf("Cannot seek: negative offset\n");
+		return -1;
+	}
+
+	int inodeIndex = fdt[fileID].inodeIndex;
+
+	if (offset > inodeTable[inodeIndex]->size) {
+		printf("Cannot seek: offset greater than file size\n");
+		return -1;
+	}
+
+	fdt[fileID].rwPtr = offset;
 	return 0;
 }
 int sfs_remove(char *file) {
