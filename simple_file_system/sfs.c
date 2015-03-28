@@ -30,6 +30,7 @@
 #define OPEN_FILES_LIMIT_REACHED -3
 
 #define NO_MORE_FREE_INODE -1
+#define FILE_DIRECTORY_FULL -1
 
 //Struct and list definitions
 typedef struct superBlock {
@@ -88,6 +89,7 @@ void initFreeBlockList() {
 
 void initRootDirInode() {
 	rootDirInode = inodeTable[ROOT_DIR_IND];
+	rootDirInode = (inode*)malloc(sizeof(inode));
 	rootDirInode -> mode = DIR;
 	rootDirInode -> size = 0;
 	rootDirInode -> blockCount = 1;
@@ -177,10 +179,11 @@ int isOpen(char* name) {
 int getFileInodeIndex(char* name) {
 	int i;
 	for (i = 0; i < MAX_NUM_FILES; i++) {
-		if (strcmp(rootDir[i]->fname, name) == 0) {
+		if (rootDir[i] != NULL && strcmp(rootDir[i]->fname, name) == 0) {
 			return rootDir[i]->inodeIndex;
 		}
 	}
+	return FILE_DNE;
 }
 
 int getFirstFreeFdtEntry() {
@@ -210,11 +213,19 @@ int createInode() {
 }
 
 int getFirstFreeBlockInRootDir() {
-
+	return 0;
 }
 
 int createFileInRootDir(char *name, int inodeIndex) {
-	return 0;
+	int i;
+	for (i = 0; i < MAX_NUM_FILES; i++) {
+		if (rootDir[i] == NULL) {
+			rootDir[i] = (rootDirEntry*)malloc(sizeof(rootDirEntry));
+			strcpy(rootDir[i]->fname, name);
+			return i;
+		}
+	}
+	return FILE_DIRECTORY_FULL;
 }
 
 int sfs_fopen(char *name) {
