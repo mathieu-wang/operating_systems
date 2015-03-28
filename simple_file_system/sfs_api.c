@@ -7,7 +7,7 @@
 #define MAGIC_NUMBER 0xAABB0005
 #define BLOCK_SIZE 512
 #define NUM_BLOCKS 1000
-#define NUM_INODES 100
+#define NUM_INODES 111
 #define ROOT_DIR_IND 0
 
 //inode modes
@@ -17,9 +17,12 @@
 #define DEFAULT_UID 1
 #define DEFAULT_GID 1
 
+#define NUM_INODE_DIR_BLOCKS 60
+
 #define MAX_FNAME_LENGTH 20
-#define MAX_NUM_FILES 150
-#define OPEN_FILES_LIMIT 150
+#define MAX_NUM_FILES 110
+#define OPEN_FILES_LIMIT 110
+#define MAX_BYTES 30000
 
 #define FREE 0
 #define NOT_FREE 1
@@ -45,14 +48,15 @@ typedef struct superBlock {
 
 superBlock sb = {MAGIC_NUMBER, BLOCK_SIZE, NUM_BLOCKS, NUM_INODES, ROOT_DIR_IND, 0};
 
-// does not implement atime, ctime, mtime, access mode and indirect blocks
+// does not implement atime, ctime, mtime, access mode and more than one level of indirect blocks
 typedef struct inode {
 	int mode;
 	int size;
 	int blockCount;
 	int uid;
 	int gid;
-	int blockPtrs[12];
+	int blockPtrs[NUM_INODE_DIR_BLOCKS];
+	int indirectBlock;
 } inode;
 
 typedef struct rootDirEntry {
@@ -95,6 +99,11 @@ void initRootDirInode() {
 	inodeTable[ROOT_DIR_IND] -> uid = DEFAULT_UID;
 	inodeTable[ROOT_DIR_IND] -> gid = DEFAULT_GID;
 	inodeTable[ROOT_DIR_IND] -> blockPtrs[0] = NUM_INODES + 1; //use the block after inode table to store root directory data
+	int i;
+	for (i = 1; i < NUM_INODE_DIR_BLOCKS; i++) {
+		inodeTable[ROOT_DIR_IND] -> blockPtrs[i] = -1;
+	}
+	inodeTable[ROOT_DIR_IND] -> indirectBlock = -1;
 }
 
 void writeToDisk() {
@@ -113,7 +122,7 @@ void writeToDisk() {
 void readFromDisk() {
 	read_blocks(0, 1, (void*)&sb);
 	int i;
-	for (i = 1; i < NUM_INODES-2; i++) {
+	for (i = 1; i < NUM_INODES-10; i++) {
 		read_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
 	int rootDirBlockCount = inodeTable[ROOT_DIR_IND]->blockCount;
@@ -146,6 +155,8 @@ void initFdt() {
 	}
 }
 
+void printRootDir();
+
 int mksfs(int fresh){
 	char* diskName = "Disk";
 	if (fresh) {
@@ -158,6 +169,8 @@ int mksfs(int fresh){
 
 		initFdt();
 
+		//printRootDir();
+
 		return 0;
 	} else {
 		if (init_disk(diskName, BLOCK_SIZE, NUM_BLOCKS) == -1)
@@ -165,6 +178,8 @@ int mksfs(int fresh){
 
 		readFromDisk();
 		initFdt();
+
+		//printRootDir();
 
 		return 0;
 	}
@@ -215,6 +230,11 @@ int createInode() {
 			inodeTable[i] -> blockCount = 0;
 			inodeTable[i] -> uid = DEFAULT_UID;
 			inodeTable[i] -> gid = DEFAULT_GID;
+			int j;
+			for (j = 1; j < NUM_INODE_DIR_BLOCKS; j++) {
+				inodeTable[i] -> blockPtrs[j] = -1;
+			}
+			inodeTable[i] -> indirectBlock = -1;
 			return i;
 		}
 	}
@@ -248,6 +268,16 @@ void printFdt() {
 	}
 }
 
+void printRootDir() {
+	printf("\nRoot Directory\n");
+	int i;
+	for(i = 0; i < MAX_NUM_FILES; i++) {
+		if(rootDir[i] != NULL)	{
+			printf("fname: %s, inodeIndex: %d\n", rootDir[i]->fname, rootDir[i]->inodeIndex);
+		}
+	}
+}
+
 int sfs_fopen(char *name) {
 	int open = isOpen(name);
 
@@ -257,6 +287,7 @@ int sfs_fopen(char *name) {
 	}
 
 	// check if file exists
+	//printf("GETTING fileInodeInd for %s\n", name);
 	int fileInodeInd = getFileInodeIndex(name);
 	int fdIndex = -1;
 
@@ -276,7 +307,8 @@ int sfs_fopen(char *name) {
 		fdt[fdIndex].inodeIndex = fileInodeInd;
 	}
 
-	//printFdt();
+	// printFdt();
+	// printRootDir();
 	return fdIndex;
 }
 
@@ -287,7 +319,8 @@ int sfs_fclose(int fileID) {
 		return -1;
 	}
 	initFdtEntry(fileID);
-	//printFdt();
+	// printFdt();
+	// printRootDir();
 	return 0;
 }
 int sfs_fwrite(int fileID, const char *buf, int length) {
@@ -306,5 +339,11 @@ int sfs_get_next_filename(char* filename) {
 	return 0;
 }
 int sfs_GetFileSize(const char* path) {
-	return 0;
+	int locInodeIndex = getFileInodeIndex((char*)path);
+
+	if (locInodeIndex < 0) {
+		return -1;
+	} else {
+		return inodeTable[locInodeIndex]->size;
+	}
 }
