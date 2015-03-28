@@ -112,7 +112,7 @@ void writeToDisk() {
 void readFromDisk() {
 	read_blocks(0, 1, (void*)&sb);
 	int i;
-	for (i = 1; i < NUM_INODES; i++) {
+	for (i = 1; i < NUM_INODES-2; i++) {
 		read_blocks(i, 1,(void*)inodeTable[i]); //one inode per block
 	}
 	read_blocks(NUM_INODES+1, 1, (void*)rootDir); //first data block
@@ -178,7 +178,7 @@ int isOpen(char* name) {
 			}
 		}	
 	}
-	printf("File %s is not open\n", name);
+	//printf("File %s is not open\n", name);
 	return FILE_NOT_OPEN;
 }
 
@@ -273,18 +273,18 @@ int sfs_fopen(char *name) {
 		fdt[fdIndex].inodeIndex = fileInodeInd;
 	}
 
-	printFdt();
+	//printFdt();
 	return fdIndex;
 }
 
-int sfs_fclose(int fileIndex) {
+int sfs_fclose(int fileID) {
 	// check if file is open
-	if (fdt[fileIndex].hasFile != 1) {
-		printf("File with index %d is not open..\n", fileIndex);
+	if (fdt[fileID].hasFile != 1) {
+		printf("File with index %d is not open..\n", fileID);
 		return -1;
 	}
-	initFdtEntry(fileIndex);
-	printFdt();
+	initFdtEntry(fileID);
+	//printFdt();
 	return 0;
 }
 int sfs_fwrite(int fileID, const char *buf, int length) {
