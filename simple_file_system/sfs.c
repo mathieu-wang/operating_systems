@@ -29,6 +29,8 @@
 #define FILE_DNE -2
 #define OPEN_FILES_LIMIT_REACHED -3
 
+#define NO_MORE_FREE_INODE -1
+
 //Struct and list definitions
 typedef struct superBlock {
 	//use long for everything because need minimum 4 bytes long
@@ -54,7 +56,7 @@ typedef struct inode {
 
 typedef struct rootDirEntry {
 	char fname[MAX_FNAME_LENGTH];
-	int inode_index;
+	int inodeIndex;
 } rootDirEntry;
 
 rootDirEntry* rootDir[MAX_NUM_FILES];
@@ -183,7 +185,7 @@ int getFileInodeIndex(char* name) {
 
 int getFirstFreeFdtEntry() {
 	int i;
-	for(i = 0; j < OPEN_FILES_LIMIT; i++) {
+	for(i = 0; i < OPEN_FILES_LIMIT; i++) {
 		if(fdt[i].hasFile != 1)	{
 			return i;
 		}
@@ -195,44 +197,55 @@ int createInode() {
 	int i;
 	for (i = 0; i < NUM_INODES; i++) {
 		if (inodeTable[i] == NULL) {
+			inodeTable[i] = (inode*)malloc(sizeof(inode));
 			inodeTable[i] -> mode = FILE;
-			inodeTable[i] -> size = 0;
+			inodeTable[i] -> size = 1;
 			inodeTable[i] -> blockCount = 0;
 			inodeTable[i] -> uid = DEFAULT_UID;
 			inodeTable[i] -> gid = DEFAULT_GID;
-			inodeTable[i] -> blockPtrs[0] = NUM_INODES + 1;
+			return i;
 		}
 	}
+	return NO_MORE_FREE_INODE;
 }
 
-int createFileInRootDir() {
+int getFirstFreeBlockInRootDir() {
 
+}
+
+int createFileInRootDir(char *name, int inodeIndex) {
+	return 0;
 }
 
 int sfs_fopen(char *name) {
-	int isOpen = isOpen(name);
+	int open = isOpen(name);
 
-	if (isOpen != FILE_NOT_OPEN) {
+	if (open != FILE_NOT_OPEN) {
 		printf("File already open..\n");
-		return isOpen;
+		return open;
 	}
 
 	// check if file exists
 	int fileInodeInd = getFileInodeIndex(name);
+	int fdIndex = -1;
 
 	if (fileInodeInd == FILE_DNE) { // file doesn not exist --> create file
 		//TODO create file
+		int inodeIndex = createInode();
+		if (inodeIndex != NO_MORE_FREE_INODE) {
+			fdIndex = createFileInRootDir(name, inodeIndex);
+		}
+		return fdIndex;
+
 	} else { // file exists --> open
 		int fdIndex = getFirstFreeFdtEntry();
-		if (fdIndex < 0) {
-			return fdIndex //OPEN_FILE_LIMIT_REACHED
-		} else {
+		if (fdIndex >= 0) {
 			fdt[fdIndex].hasFile = 1;
 			fdt[fdIndex].inodeIndex = fileInodeInd;
-			//TODO set rwPtr?
 		}
-
 	}
+
+	return fdIndex;
 }
 
 int sfs_fclose(int fileID) {
