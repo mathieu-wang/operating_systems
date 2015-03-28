@@ -258,6 +258,17 @@ int createFileInRootDir(char *name, int inodeIndex) {
 	return ROOT_DIRECTORY_FULL;
 }
 
+int removeFileInRootDir(char *name) {
+	int i;
+	for (i = 0; i < MAX_NUM_FILES; i++) {
+		if (rootDir[i] != NULL && strcmp(rootDir[i]->fname, name) == 0) {
+			free(rootDir[i]);
+			return 0;
+		}
+	}
+	return FILE_DNE;
+}
+
 void printFdt() {
 	printf("\nFile Descriptor Table\n");
 	int i;
@@ -333,9 +344,37 @@ int sfs_fseek(int fileID, int offset) {
 	return 0;
 }
 int sfs_remove(char *file) {
+	// if file does not exist, error, return
+	// printf("BEFORE:\n");
+	// printRootDir();
+
+	int fileInodeInd = getFileInodeIndex(file);
+	if (fileInodeInd == FILE_DNE) {
+		return -1;
+	}
+
+	int open = isOpen(file);
+	if (open != FILE_NOT_OPEN) {
+		return -2; //cannot remove file if open
+	}
+
+	int removeStatus = removeFileInRootDir(file);
+	if (removeStatus == FILE_DNE) {
+		return -1;
+	}
+
+	inode* in = inodeTable[fileInodeInd];
+	//free(in -> blockPtrs);
+	free(in);
+
+	writeToDisk();
+
+	// printf("Removed: %s\n", file);
+	// printRootDir();
 	return 0;
 }
 int sfs_get_next_filename(char* filename) {
+	//NOT USED
 	return 0;
 }
 int sfs_GetFileSize(const char* path) {
