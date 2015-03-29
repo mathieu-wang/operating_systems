@@ -226,8 +226,8 @@ int createInode() {
 		if (inodeTable[i] == NULL) {
 			inodeTable[i] = (inode*)malloc(sizeof(inode));
 			inodeTable[i] -> mode = FILE;
-			inodeTable[i] -> size = 1;
-			inodeTable[i] -> blockCount = 0;
+			inodeTable[i] -> size = 0;
+			inodeTable[i] -> blockCount = 1;
 			inodeTable[i] -> uid = DEFAULT_UID;
 			inodeTable[i] -> gid = DEFAULT_GID;
 			int j;
@@ -239,10 +239,6 @@ int createInode() {
 		}
 	}
 	return NO_MORE_FREE_INODE;
-}
-
-int getFirstFreeBlockInRootDir() {
-	return 0;
 }
 
 int createFileInRootDir(char *name, int inodeIndex) {
@@ -316,6 +312,7 @@ int sfs_fopen(char *name) {
 		strcpy(fdt[fdIndex].fname, name);
 		fdt[fdIndex].hasFile = 1;
 		fdt[fdIndex].inodeIndex = fileInodeInd;
+		fdt[fdIndex].rwPtr = inodeTable[fileInodeInd] -> size;
 	}
 
 	// printFdt();
@@ -334,11 +331,68 @@ int sfs_fclose(int fileID) {
 	// printRootDir();
 	return 0;
 }
+
+int getStartingBlockPtrIndex(inode* in, int length) {
+	int i;
+	for (i = 0; i < NUM_INODE_DIR_BLOCKS-1; i++){
+		// printf("Length: %d\n", length);
+		if (length >= in->blockPtrs[i]*BLOCK_SIZE && length <= in->blockPtrs[i+1]*BLOCK_SIZE){
+			return i;
+		}
+	}
+	return -1;
+}
+
 int sfs_fwrite(int fileID, const char *buf, int length) {
-	return 0;
+	if(length < 0){
+		return -1;
+	}
+
+	int fileInodeIndex = fdt[fileID].inodeIndex;
+	inode* fileInode = inodeTable[fileInodeIndex];
+	int rwPtr = fdt[fileID].rwPtr;
+
+	//getFirstFreeBlock
+	// printf("file size: %d\n", fileInode -> size);
+
+	if (fileInode -> size == 0) { //empty file
+		int numBlocks = length/BLOCK_SIZE;
+
+		if (numBlocks == 0) { //less than a block
+			int freeDataBlock = getFirstFreeBlock();
+			write_blocks(freeDataBlock, 1, (void*)buf);
+		} else {
+			//TODO
+		}
+	} else { //file already has content
+		//Not an empty file
+
+		int startingBlockPtrIndex = getStartingBlockPtrIndex(fileInode, length);
+		if (startingBlockPtrIndex < 0) {
+			return -1;
+		}
+		int startingBlock = fileInode -> blockPtrs[startingBlockPtrIndex];
+
+		int offsetFromLastBlock = rwPtr - (startingBlock-1)*BLOCK_SIZE;
+		int remainingBytesInCurrentBlock = BLOCK_SIZE - offsetFromLastBlock;
+
+		if(length < remainingBytesInCurrentBlock) { //current block is enough
+			char* tmpBuffer[BLOCK_SIZE];
+
+			memset(tmpBuffer, 0, sizeof(tmpBuffer));
+			read_blocks(startingBlock, 1, tmpBuffer);
+
+			memcpy((void *)&(tmpBuffer[offsetFromLastBlock]),(const void *)buf, length); 
+			write_blocks(startingBlock, 1, tmpBuffer); //overwrite block with old + new content
+
+		} else {
+			//TODO
+		}
+	}
+	return length;
 }
 int sfs_fread(int fileID, char *buf, int length) {
-	return 0;
+	return length;
 }
 int sfs_fseek(int fileID, int offset) {
 	if (fdt[fileID].hasFile != 1) {
