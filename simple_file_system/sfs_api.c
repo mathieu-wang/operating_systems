@@ -392,8 +392,25 @@ int sfs_fwrite(int fileID, const char *buf, int length) {
 	return length;
 }
 int sfs_fread(int fileID, char *buf, int length) {
+	if(fdt[fileID].hasFile != 1 || length < 0){
+		return -1;
+	}
+	int numBlocks = length/BLOCK_SIZE;
+	int fileInodeIndex = fdt[fileID].inodeIndex;
+	inode* fileInode = inodeTable[fileInodeIndex];
+	int rwPtr = fdt[fileID].rwPtr;
+
+	int i;
+	for (i = 0; i < numBlocks; i++) {
+		printf("blockPtrs[i]: %d\n", fileInode -> blockPtrs[i]);
+		if (fileInode -> blockPtrs[i] == -1) { //no data
+			break;
+		}
+		read_blocks(fileInode -> blockPtrs[i], 1, buf + i*BLOCK_SIZE);
+	}
 	return length;
 }
+
 int sfs_fseek(int fileID, int offset) {
 	if (fdt[fileID].hasFile != 1) {
 		printf("Cannot seek: file with id %d is not open\n",fileID);
