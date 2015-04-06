@@ -22,7 +22,6 @@ typedef struct free_list_block {
 	int length;
 	struct block *prev;
 	struct block *next;
-	char *data_ptr;
 } block;
 
 block *head;
@@ -35,17 +34,16 @@ void *my_malloc(int size) {
 
 		head = &(block){0, NULL, NULL, NULL};
 		head -> length = MIN_REQUEST_SIZE;
-		head -> data_ptr = head + 1; //start at next byte
 
 		//brk(head + (sizeof(block) + MIN_REQUEST_SIZE)); ?
 		sbrk(sizeof(block) + MIN_REQUEST_SIZE);
+	} else {
+		printf("%s\n", "Head initialized\n");
 	}
 	if (head == NULL) {
 		printf("%s\n", "Init head failed\n");
 	}
-
-
-
+	return head;
 }
 
 void my_free(void *ptr) {
@@ -70,16 +68,27 @@ void my_mallinfo() {
 }
 
 int main(int argc, char *argv[]) {
-	printf("%ld\n", (long)sbrk(0));
-	my_malloc(2);
+	long init = (long)sbrk(0);
+	printf("Initial Address: %ld\n", init);
+	// my_malloc(2);
 	printf("Size of block: %d\n", sizeof(block));
 	printf("Size of block*: %d\n", sizeof(block*));
 	printf("Size of int: %d\n", sizeof(int));
 	printf("Size of char: %d\n", sizeof(char));
 	printf("Size of char*: %d\n", sizeof(char*));
 	printf("Address of head:%ld\n", head);
-	printf("%ld\n", (long)sbrk(0));
-	printf("%ld\n", (long)sbrk(0));
+	long final = (long)sbrk(0);
+	printf("Final Address: %ld\n", final);
+	printf("Difference: %ld\n", final - init);
+
+	char *ptrs[32];
+	int i;
+
+	// try allocating 32 KB
+	for (i=0; i< 32; i++) {
+	    ptrs[i] = (char*)my_malloc(1024);
+	    printf("%ld\n", ptrs[i]);
+	}
 
 	return 0;
 }
