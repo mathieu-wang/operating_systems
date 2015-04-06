@@ -60,7 +60,7 @@ void *my_malloc(int size) {
     block *ptr = head;
 
     if (ptr == NULL) {
-        printf("%s\n", "Head is NULL, need to request memory.\n");
+        printf("\n%s\n\n", "Head is NULL, need to request memory.");
 
         ptr = &(block){0, NULL, NULL, NULL};
         ptr -> length = MIN_REQUEST_SIZE;
@@ -102,7 +102,28 @@ void my_mallinfo() {
 int main(int argc, char *argv[]) {
     long init = (long)sbrk(0);
     printf("Initial Address: %ld\n", init);
-    my_malloc(2);
+
+    puts("Test find_free with first fit policy:");
+    my_mallopt(FIRST_FIT);
+    puts("Before allocating, try to find a free block of 3KB, should return NULL.");
+    block *free_block = find_free(3*ONE_KB);
+
+    if (free_block == NULL) {
+        puts("Pass: Could not find a free block of 3KB.");
+    } else {
+        puts("Fail: found a free block of 3KB.");
+    }
+
+    puts("After allocating 2KB, try to find a free block of 3KB, should return a block of size 128KB (Minimum request to sbrk).");
+    my_malloc(2*ONE_KB);
+    free_block = find_free(3*ONE_KB);
+    if (free_block == NULL) {
+        puts("Fail: Could not find a free block of 3KB.");
+    } else {
+        puts("Pass: found a free block of 3KB.");
+    }
+
+
     printf("Size of block: %d\n", sizeof(block));
     printf("Size of block*: %d\n", sizeof(block*));
     printf("Size of int: %d\n", sizeof(int));
