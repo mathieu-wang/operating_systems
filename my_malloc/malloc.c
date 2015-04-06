@@ -5,7 +5,6 @@
 #define FIRST_FIT 0
 #define BEST_FIT 1
 #define ONE_KB 1024
-#define MIN_REQUEST_SIZE 128*ONE_KB //Request 128 KB at a time
 
 
 void *my_malloc(int size);
@@ -15,10 +14,11 @@ void my_mallinfo();
 
 //global variables:
 extern char *my_malloc_error;
+const int min_req_size = 128*ONE_KB;
 int current_policy = FIRST_FIT;
 
-//Define a free_list_block struct and name head as the first node of the doubly linked list of free_list_blocks
-typedef struct free_list_block {
+//Define a block struct and name head as the first node of the doubly linked list of free_list_blocks
+typedef struct block {
     int length;
     struct block *prev;
     struct block *next;
@@ -62,18 +62,42 @@ void *my_malloc(int size) {
     if (ptr == NULL) {
         printf("\n%s\n\n", "Head is NULL, need to request memory.");
 
-        ptr = &(block){0, NULL, NULL, NULL};
-        ptr -> length = MIN_REQUEST_SIZE;
+        ptr = &(block){0, NULL, NULL};
+        ptr -> length = min_req_size;
         head = ptr;
 
-        sbrk(sizeof(block) + MIN_REQUEST_SIZE);
+        sbrk(sizeof(block) + min_req_size);
+
+        if (head == NULL) {
+            printf("%s\n", "Init head failed\n");
+        }
+
     }
 
     block *free_block = find_free(size);
+    if (free_block == NULL) { // No block is large enough, so need to sbrk
+        while (ptr -> next != NULL) {
+            ptr = ptr -> next; //go to the last free block
+        }
 
-    if (head == NULL) {
-        printf("%s\n", "Init head failed\n");
+        int extra_length = (size/min_req_size + 1) * min_req_size;
+        ptr -> length += extra_length; //request the multiple of min_req_size that's right above "size"
+        sbrk(extra_length);
+
+        // printf("Size: %d\n", size);
+        // printf("min_req_size: %d\n", min_req_size);
+        // printf("size/min_req_size: %d\n", size/min_req_size);
+        // printf("Extra length required: %d\n", extra_length);
     }
+    free_block = find_free(size);
+
+    if (free_block == NULL) {
+        puts("Error doing sbrk, should find a free_block now but didn't");
+        return (void*)-1;
+    }
+
+
+
 
     return ptr;
 }
@@ -124,12 +148,12 @@ int main(int argc, char *argv[]) {
     }
 
 
-    printf("Size of block: %d\n", sizeof(block));
-    printf("Size of block*: %d\n", sizeof(block*));
-    printf("Size of int: %d\n", sizeof(int));
-    printf("Size of char: %d\n", sizeof(char));
-    printf("Size of char*: %d\n", sizeof(char*));
-    printf("Address of head:%ld\n", head);
+    printf("Size of block: %d\n", (int)sizeof(block));
+    printf("Size of block*: %d\n", (int)sizeof(block*));
+    printf("Size of int: %d\n", (int)sizeof(int));
+    printf("Size of char: %d\n", (int)sizeof(char));
+    printf("Size of char*: %d\n", (int)sizeof(char*));
+    printf("Address of head:%ld\n", (long)head);
     long final = (long)sbrk(0);
     printf("Final Address: %ld\n", final);
     printf("Difference: %ld\n", final - init);
@@ -140,7 +164,7 @@ int main(int argc, char *argv[]) {
     // try allocating 32 KB
     for (i=0; i< 32; i++) {
         ptrs[i] = (char*)my_malloc(1024);
-        printf("%ld\n", ptrs[i]);
+        printf("%ld\n", (long)ptrs[i]);
         printf("Address: %ld\n", (long)sbrk(0));
     }
 
