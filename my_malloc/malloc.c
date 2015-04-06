@@ -29,20 +29,22 @@ block *head;
 void *my_malloc(int size) {
 	//if memory could not be allocated, return NULL and sets my_malloc_error
 
-	if (head == NULL) {
+	block *ptr = head;
+
+	if (ptr == NULL) {
 		printf("%s\n", "Head is NULL, need to request memory.\n");
 
-		head = &(block){0, NULL, NULL, NULL};
-		head -> length = MIN_REQUEST_SIZE;
+		ptr = &(block){0, NULL, NULL, NULL};
+		ptr -> length = MIN_REQUEST_SIZE;
+		head = ptr;
 
 		//brk(head + (sizeof(block) + MIN_REQUEST_SIZE)); ?
 		sbrk(sizeof(block) + MIN_REQUEST_SIZE);
-	} else {
-		printf("%s\n", "Head initialized\n");
 	}
 	if (head == NULL) {
 		printf("%s\n", "Init head failed\n");
 	}
+
 	return head;
 }
 
@@ -70,7 +72,7 @@ void my_mallinfo() {
 int main(int argc, char *argv[]) {
 	long init = (long)sbrk(0);
 	printf("Initial Address: %ld\n", init);
-	// my_malloc(2);
+	my_malloc(2);
 	printf("Size of block: %d\n", sizeof(block));
 	printf("Size of block*: %d\n", sizeof(block*));
 	printf("Size of int: %d\n", sizeof(int));
