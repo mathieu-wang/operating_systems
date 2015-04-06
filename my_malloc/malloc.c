@@ -26,6 +26,34 @@ typedef struct free_list_block {
 
 block *head;
 
+void *find_free(int size) {
+    if (head == NULL) return NULL;
+
+    block *current = head;
+
+    if (current_policy == FIRST_FIT) {
+        while (current != NULL) {
+            if (current -> length > size) {
+                return current;
+            }
+            current = current -> next;
+        }
+        return NULL; //could not find any free block that fits "size" bytes
+    } else { //current_policy == BEST_FIT
+        int best_length = current -> length;
+        block *best_block = NULL;
+
+        while (current != NULL) {
+            int current_length = current->length;
+            if (current_length > size && current_length < best_length) {
+                best_length = current_length;
+                best_block = current;
+            }
+        }
+        return best_block;
+    }
+}
+
 void *my_malloc(int size) {
     //if memory could not be allocated, return NULL and sets my_malloc_error
 
@@ -38,14 +66,16 @@ void *my_malloc(int size) {
         ptr -> length = MIN_REQUEST_SIZE;
         head = ptr;
 
-        //brk(head + (sizeof(block) + MIN_REQUEST_SIZE)); ?
         sbrk(sizeof(block) + MIN_REQUEST_SIZE);
     }
+
+    block *free_block = find_free(size);
+
     if (head == NULL) {
         printf("%s\n", "Init head failed\n");
     }
 
-    return head;
+    return ptr;
 }
 
 void my_free(void *ptr) {
@@ -90,6 +120,7 @@ int main(int argc, char *argv[]) {
     for (i=0; i< 32; i++) {
         ptrs[i] = (char*)my_malloc(1024);
         printf("%ld\n", ptrs[i]);
+        printf("Address: %ld\n", (long)sbrk(0));
     }
 
     return 0;
