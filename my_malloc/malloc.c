@@ -17,6 +17,10 @@ extern char *my_malloc_error;
 const int min_req_size = 128*ONE_KB;
 int current_policy = FIRST_FIT;
 
+int total_allocated;
+int total_free;
+int largest_contiguous_free;
+
 //Define a block struct and name head as the first node of the doubly linked list of free_list_blocks
 typedef struct block {
     int length;
@@ -62,7 +66,6 @@ void print_pb() {
 void remove_block_from_free_list(block* free_block) {
 	free_block -> prev -> next = free_block -> next;
 	free_block -> next -> prev = free_block -> prev;
-	free_block = NULL;
 }
 
 void print_block(block* bl) {
@@ -93,6 +96,7 @@ void *my_malloc(int size) {
         head = ptr;
 
         sbrk(min_req_size);
+        total_free = (min_req_size-sizeof(block));
 
         if (head == NULL) {
             printf("%s\n", "Init head failed\n");
@@ -111,6 +115,7 @@ void *my_malloc(int size) {
 
         int extra_length = (size/min_req_size + 1) * min_req_size; //request the multiple of min_req_size that's right above "size"
         sbrk(extra_length);
+        total_free += extra_length;
         ptr -> length += extra_length;
 
         // printf("Size: %d\n", size);
@@ -124,8 +129,6 @@ void *my_malloc(int size) {
     // print_block(free_block);
 
     if (free_block == NULL) {
-    	//my_malloc_error = "Error doing sbrk, should find a free_block now but didn't";
-        //puts(my_malloc_error);
         puts("Error doing sbrk, should find a free_block now but didn't");
         return (void*)-1;
     }
@@ -134,18 +137,17 @@ void *my_malloc(int size) {
     if (free_block -> length == size) { //same size requested as the free block's length, simply remove it from free block list
     	puts("Exact free space left.");
     	remove_block_from_free_list(free_block);
+    	total_allocated += size;
     } else { //need to make whatever free space left a new free block
-    	// block *new_free_block = (block *)(free_block + size);
-    	// puts("FREE BLOCK AGAIN:");
-    	// print_block(free_block);
     	block *new_free_block = &(block){free_block->length - size, free_block -> prev, free_block -> next};
-    	// puts("NEW FREE BLOCK:");
-    	// print_block(new_free_block);
-    	// new_free_block -> length = free_block -> length - size;
-    	// new_free_block -> prev = free_block -> prev;
-    	// new_free_block -> next = free_block -> next;
     	free_block -> length = size;
+    	if (free_block -> prev != NULL)
+    		free_block -> prev -> next = new_free_block;
+    	if (free_block -> next != NULL)
+    		free_block -> next -> prev = new_free_block;
     	ptr = free_block; //free block is no longer free
+    	total_allocated += size;
+    	total_free -= size;
     }
 
     return ptr;
@@ -163,13 +165,22 @@ void my_mallopt(int policy) {
     current_policy = policy;
 }
 
-void my_mallinfo() {
-    // should print:
-    //-total number of bytes allocated
-    //-total free space
-    //-largest contiguous free space
-    //-other info
+int find_largest_contiguous_free_space() {
+	block *cur = head;
+	int largest_free = 0;
+	while (cur != NULL) {
+		if (cur -> length > largest_free) {
+			largest_free = cur -> length;
+		}
+		cur = cur -> next;
+	}
+	return largest_free;
+}
 
+void my_mallinfo() {
+    printf("Total Number of Bytes Allocated: %d\n", total_allocated);
+    printf("Total Number of Free Bytes: %d\n", total_free);
+    printf("Largest Contiguous Free Space: %d\n", find_largest_contiguous_free_space());
 }
 
 int main(int argc, char *argv[]) {
@@ -188,7 +199,11 @@ int main(int argc, char *argv[]) {
  //        puts("Fail: found a free block of 3KB.");
  //    }
     puts("Allocate one KB");
+
+    my_mallinfo();
 	my_malloc(ONE_KB);
+	my_mallinfo();
+	print_free_list();
 
 	long current_pb = (long)sbrk(0);
 
