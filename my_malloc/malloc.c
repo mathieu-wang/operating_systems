@@ -143,9 +143,6 @@ void *my_malloc(int size) {
     }
     free_block = find_free(size);
 
-    // puts("FREE BLOCK: ");
-    // print_block(free_block);
-
     if (free_block == NULL) {
         puts("Error doing sbrk, should find a free_block now but didn't");
         return (void*)-1;
@@ -175,8 +172,14 @@ void *my_malloc(int size) {
     	// printf("diff: %ld\n", (long)head - (long)sbrk(0));
     	head -> length = new_length;
     	head -> next = next;
-    	// print_block(new_head);
-    	ptr = head;
+
+    	ptr -> length -= (head -> length); //update length of old head (ptr)
+
+    	puts("ptr to be returned: ");
+    	print_block(ptr);
+
+    	puts("new head:");
+    	print_block(head);
     } else {
     	if (free_block -> length == size) { //same size requested as the free block's length, simply remove it from free block list
     		puts("Exact free space left.");
@@ -202,12 +205,53 @@ void *my_malloc(int size) {
     return ptr;
 }
 
+int is_free(block* ptr) { //checks whether ptr is in the free blocks list
+	block *cur = head;
+	while (cur != NULL) {
+		if (cur == ptr) return 1;
+		cur = cur -> next;
+	}
+	return 0;
+}
+
 void my_free(void *ptr) {
+	if (ptr == NULL) {
+		return; //do nothing if ptr is null
+	}
+	block* bl = (block*) ptr;
+
+	int length = bl -> length;
+
+	printf("length of ptr to be freed: %d\n", length);
+
+	block* right = bl + length/sizeof(block);
+	if (is_free(right)) { //if right block free, put free back into list with right length
+		if (right -> prev != NULL)
+			right -> prev -> next = bl;
+		if (right -> next != NULL)
+			right -> next -> prev = bl;
+		bl -> length += right -> length + sizeof(block);
+	}
+
+	if (bl -> prev != NULL) {
+		bl -> prev -> next = bl;
+	}
+	if (bl -> next != NULL) {
+		bl -> next -> prev = bl;
+	}
+
+	if (bl < head) {
+		bl -> next = head;
+		head = bl;
+	}
     //deallocates block of memory pointed by ptr
     //ptr should be an address previously allocated by the Memory Allocation Package
     //if ptr is NULL, don't do anything
     //does not lower program break all the time: simply adds to list of free blocks
     //lower program break when top free block is larger than 128KB
+
+    total_free += length;
+    total_allocated -= length;
 }
 
 void my_mallopt(int policy) {
@@ -251,7 +295,7 @@ int main(int argc, char *argv[]) {
  //    }
     puts("TEST 1: Allocate one KB");
 
-	my_malloc(ONE_KB);
+	void *one_kb_ptr = my_malloc(ONE_KB);
 	my_mallinfo();
 	// print_free_list();
 
@@ -271,12 +315,12 @@ int main(int argc, char *argv[]) {
 	puts("TEST 2: Allocate another 10KB");
 
 	init = (long)sbrk(0);
-	my_malloc(10*ONE_KB);
+	void *ten_kb_ptr =my_malloc(10*ONE_KB);
 	my_mallinfo();
 
 	current_pb = (long)sbrk(0);
 	change_in_pb = current_pb - init;
-	if(change_in_pb == (long)min_req_size) {
+	if(change_in_pb == 0) {
 		puts("TEST 2 PASSED: malloc did not move the program break\n");
 	} else {
 		printf("TEST 2 FAILED: malloc moved program break by %ld \n\n", change_in_pb);
@@ -286,7 +330,7 @@ int main(int argc, char *argv[]) {
 	puts("TEST 3: Allocate another 300KB");
 
 	init = (long)sbrk(0);
-	my_malloc(300*ONE_KB);
+	void *three_hundred_kb_ptr = my_malloc(300*ONE_KB);
 	my_mallinfo();
 
 	current_pb = (long)sbrk(0);
@@ -297,6 +341,21 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("TEST 3 FAILED: malloc did not move program break by 2*128KB, %ld instead\n", change_in_pb);
 	}
+
+
+
+	puts("TEST 4: Free the 10KB pointer");
+	my_free(ten_kb_ptr);
+	my_mallinfo();
+
+	current_pb = (long)sbrk(0);
+	change_in_pb = current_pb - init;
+	if(change_in_pb == 0) {
+		puts("TEST 4 PASSED: malloc did not move the program break and successfully freed the 10KB pointer\n");
+	} else {
+		printf("TEST 4 FAILED: malloc moved program break by %ld \n\n", change_in_pb);
+	}
+
 	// print_free_list();
 
     // puts("After allocating 2KB, try to find a free block of 3KB, should return a block of size 128KB (Minimum request to sbrk).");
@@ -318,16 +377,6 @@ int main(int argc, char *argv[]) {
     // long final = (long)sbrk(0);
     // printf("Final Address: %ld\n", final);
     // printf("Difference: %ld\n", final - init);
-
-    // char *ptrs[32];
-    // int i;
-
-    // // try allocating 32 KB
-    // for (i=0; i< 2; i++) {
-    //     ptrs[i] = (char*)my_malloc(1024);
-    //     printf("%ld\n", (long)ptrs[i]);
-    //     printf("Address: %ld\n", (long)sbrk(0));
-    // }
 
     return 0;
 }
