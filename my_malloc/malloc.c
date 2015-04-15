@@ -108,7 +108,7 @@ void *my_malloc(int size) {
         // printf("new pb: %p\n",new_pb);
 
         ptr = init_pb;
-        *ptr = (block){min_req_size, NULL, NULL};
+        *ptr = (block){min_req_size-sizeof(block), NULL, NULL};
         head = ptr;
 
         total_free = (min_req_size-sizeof(block));
@@ -124,20 +124,22 @@ void *my_malloc(int size) {
 
     block *free_block = find_free(size);
     if (free_block == NULL) { // No block is large enough, so need to sbrk
-        while (ptr -> next != NULL) {
+        while (ptr -> next != NULL) { //ptr == head here
             ptr = ptr -> next; //go to the last free block
         }
         puts("No block is large enough, need to sbrk");
 
-        int extra_length = (size/min_req_size + 1) * min_req_size; //request the multiple of min_req_size that's right above "size"
+        // printf("ptr length: %d\n", ptr->length);
+
+        int extra_length = ((size - ptr->length)/min_req_size + 1) * min_req_size; //request the multiple of min_req_size that's right above "size"
         sbrk(extra_length);
         total_free += extra_length;
         ptr -> length += extra_length;
 
-        printf("Size: %d\n", size);
-        printf("min_req_size: %d\n", min_req_size);
-        printf("size/min_req_size: %d\n", size/min_req_size);
-        printf("Extra length required: %d\n", extra_length);
+        // printf("Size: %d\n", size);
+        // printf("min_req_size: %d\n", min_req_size);
+        // printf("(size - ptr->length)/min_req_size : %d\n", (size - ptr->length)/min_req_size);
+        // printf("Extra length required: %d\n", extra_length);
     }
     free_block = find_free(size);
 
@@ -218,7 +220,7 @@ int find_largest_contiguous_free_space() {
 	while (cur != NULL) {
 		// print_block(cur);
 		if ((cur -> length) > largest_free) {
-			largest_free = cur -> length - sizeof(block);
+			largest_free = cur -> length;
 		}
 		cur = cur -> next;
 	}
@@ -268,6 +270,7 @@ int main(int argc, char *argv[]) {
 
 	puts("TEST 2: Allocate another 10KB");
 
+	init = (long)sbrk(0);
 	my_malloc(10*ONE_KB);
 	my_mallinfo();
 
@@ -282,6 +285,7 @@ int main(int argc, char *argv[]) {
 
 	puts("TEST 3: Allocate another 300KB");
 
+	init = (long)sbrk(0);
 	my_malloc(300*ONE_KB);
 	my_mallinfo();
 
