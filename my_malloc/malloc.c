@@ -64,11 +64,19 @@ void print_pb() {
 }
 
 void remove_block_from_free_list(block* free_block) {
-	free_block -> prev -> next = free_block -> next;
-	free_block -> next -> prev = free_block -> prev;
+	if (free_block -> prev != NULL) {
+		free_block -> prev -> next = free_block -> next;
+	}
+	if (free_block -> next != NULL) {
+		free_block -> next -> prev = free_block -> prev;
+	}
 }
 
 void print_block(block* bl) {
+	// printf("Starting Address: %p\n", bl);
+	// printf("Length: %d\n", bl->length);
+	// printf("Prev Address: %p\n", bl->prev);
+	// printf("Next Address: %p\n", bl->next);
 	printf("Starting Address: %ld\n", (long)bl);
 	printf("Length: %d\n", bl->length);
 	printf("Prev Address: %ld\n", (long) (bl->prev));
@@ -87,15 +95,22 @@ void *my_malloc(int size) {
     //if memory could not be allocated, return NULL and sets my_malloc_error
 
     block *ptr = head;
+    void *init_pb = sbrk(0);
+
+    printf("sbrk(0): %p\n", init_pb);
 
     if (ptr == NULL) {
         printf("%s\n", "Head is NULL, need to request memory.");
 
-        ptr = &(block){0, NULL, NULL};
-        ptr -> length = min_req_size;
+        sbrk(min_req_size);
+        void *new_pb = sbrk(0);
+
+        // printf("new pb: %p\n",new_pb);
+
+        ptr = init_pb;
+        *ptr = (block){min_req_size, NULL, NULL};
         head = ptr;
 
-        sbrk(min_req_size);
         total_free = (min_req_size-sizeof(block));
 
         if (head == NULL) {
@@ -103,8 +118,9 @@ void *my_malloc(int size) {
         }
 
     }
-    // puts("HEAD: ");
-    // print_block(head);
+
+    printf("sbrk(0): %ld\n", (long)sbrk(0));
+
 
     block *free_block = find_free(size);
     if (free_block == NULL) { // No block is large enough, so need to sbrk
@@ -118,10 +134,10 @@ void *my_malloc(int size) {
         total_free += extra_length;
         ptr -> length += extra_length;
 
-        // printf("Size: %d\n", size);
-        // printf("min_req_size: %d\n", min_req_size);
-        // printf("size/min_req_size: %d\n", size/min_req_size);
-        // printf("Extra length required: %d\n", extra_length);
+        printf("Size: %d\n", size);
+        printf("min_req_size: %d\n", min_req_size);
+        printf("size/min_req_size: %d\n", size/min_req_size);
+        printf("Extra length required: %d\n", extra_length);
     }
     free_block = find_free(size);
 
@@ -134,21 +150,52 @@ void *my_malloc(int size) {
     }
 
     //Now there should be a free block that's large enough
-    if (free_block -> length == size) { //same size requested as the free block's length, simply remove it from free block list
-    	puts("Exact free space left.");
-    	remove_block_from_free_list(free_block);
-    	total_allocated += size;
-    } else { //need to make whatever free space left a new free block
-    	block *new_free_block = &(block){free_block->length - size, free_block -> prev, free_block -> next};
-    	free_block -> length = size;
-    	if (free_block -> prev != NULL)
-    		free_block -> prev -> next = new_free_block;
-    	if (free_block -> next != NULL)
-    		free_block -> next -> prev = new_free_block;
-    	ptr = free_block; //free block is no longer free
-    	total_allocated += size;
-    	total_free -= size;
+    
+    //IF FREE_BLOCK IS HEAD, NEED TO HAVE SPECIAL CASE
+    if (free_block == head) {
+    	print_block(head);
+    	// printf("sbrk(0): %p\n", sbrk(0));
+    	int new_length = head->length - size;
+    	block* next = head -> next;
+
+    	// printf("new length: %d\n", new_length);
+
+    	// printf("old head : %ld\n", (long)head);
+    	// printf("old head + size : %ld\n", (long)(head + size));
+    	// printf("old head + 10240 : %ld\n", (long)(head + 10240));
+    	head = head + size/sizeof(block);
+
+    	// printf("size: %d\n", size);
+    	// printf("sbrk(0): %ld\n", (long)sbrk(0));
+
+    	// printf("new head: %ld\n", (long)head);
+
+    	// printf("diff: %ld\n", (long)head - (long)sbrk(0));
+    	head -> length = new_length;
+    	head -> next = next;
+    	// print_block(new_head);
+    	ptr = head;
+    } else {
+    	if (free_block -> length == size) { //same size requested as the free block's length, simply remove it from free block list
+    		puts("Exact free space left.");
+    		remove_block_from_free_list(free_block);
+    	} else { //need to make whatever free space left a new free block
+    		block *new_free_block = free_block + size/sizeof(block);
+    		*new_free_block = (block){free_block->length - size, free_block -> prev, free_block -> next};
+    		free_block -> length = size;
+    		if (free_block -> prev != NULL) {
+    			puts("Setting previous block's next pointer");
+    			free_block -> prev -> next = new_free_block;
+    		}
+    		if (free_block -> next != NULL) {
+    			puts("Setting next block's prev pointer");
+    			free_block -> next -> prev = new_free_block;
+    		}
+    		ptr = free_block; //free block is no longer free
+    	}
     }
+    total_allocated += size;
+    total_free -= size;
 
     return ptr;
 }
@@ -169,8 +216,9 @@ int find_largest_contiguous_free_space() {
 	block *cur = head;
 	int largest_free = 0;
 	while (cur != NULL) {
-		if (cur -> length > largest_free) {
-			largest_free = cur -> length;
+		// print_block(cur);
+		if ((cur -> length) > largest_free) {
+			largest_free = cur -> length - sizeof(block);
 		}
 		cur = cur -> next;
 	}
@@ -178,9 +226,10 @@ int find_largest_contiguous_free_space() {
 }
 
 void my_mallinfo() {
-    printf("Total Number of Bytes Allocated: %d\n", total_allocated);
-    printf("Total Number of Free Bytes: %d\n", total_free);
-    printf("Largest Contiguous Free Space: %d\n", find_largest_contiguous_free_space());
+	int largest_contiguous_free = find_largest_contiguous_free_space();
+    printf("\nTotal Number of Bytes Allocated: %d (= %d KB)\n", total_allocated, total_allocated/1024);
+    printf("Total Number of Free Bytes:      %d (= %d KB)\n", total_free, total_free/1024);
+    printf("Largest Contiguous Free Space:   %d (= %d KB)\n\n", largest_contiguous_free, largest_contiguous_free/1024);
 }
 
 int main(int argc, char *argv[]) {
@@ -198,12 +247,11 @@ int main(int argc, char *argv[]) {
  //    } else {
  //        puts("Fail: found a free block of 3KB.");
  //    }
-    puts("Allocate one KB");
+    puts("TEST 1: Allocate one KB");
 
-    my_mallinfo();
 	my_malloc(ONE_KB);
 	my_mallinfo();
-	print_free_list();
+	// print_free_list();
 
 	long current_pb = (long)sbrk(0);
 
@@ -212,9 +260,38 @@ int main(int argc, char *argv[]) {
 	// printf("%ld\n%ld\n", change_in_pb, (long)min_req_size);
 
 	if(change_in_pb == (long)min_req_size) {
-		puts("Pass: malloc requested 128KB");
+		puts("TEST 1 PASSED: malloc moved program break by 128KB and allocated 1KB\n");
 	} else {
-		printf("Fail: malloc did not request 128KB, %ld instead\n", change_in_pb);
+		printf("TEST 1 FAILED: malloc did not move program break by 128KB, %ld instead\n", change_in_pb);
+	}
+
+
+	puts("TEST 2: Allocate another 10KB");
+
+	my_malloc(10*ONE_KB);
+	my_mallinfo();
+
+	current_pb = (long)sbrk(0);
+	change_in_pb = current_pb - init;
+	if(change_in_pb == (long)min_req_size) {
+		puts("TEST 2 PASSED: malloc did not move the program break\n");
+	} else {
+		printf("TEST 2 FAILED: malloc moved program break by %ld \n\n", change_in_pb);
+	}
+
+
+	puts("TEST 3: Allocate another 300KB");
+
+	my_malloc(300*ONE_KB);
+	my_mallinfo();
+
+	current_pb = (long)sbrk(0);
+	change_in_pb = current_pb - init;
+
+	if(change_in_pb == (long)(2*min_req_size)) {
+		puts("TEST 3 PASSED: malloc moved program break by 2*128KB and allocated 300KB\n");
+	} else {
+		printf("TEST 3 FAILED: malloc did not move program break by 2*128KB, %ld instead\n", change_in_pb);
 	}
 	// print_free_list();
 
