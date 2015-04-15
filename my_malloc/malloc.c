@@ -225,13 +225,26 @@ void my_free(void *ptr) {
 	printf("length of ptr to be freed: %d\n", length);
 
 	block* right = bl + length/sizeof(block);
+
+	puts("Current block: ");
+	print_block(bl);
+	puts("RIGHT BLOCK: ");
+	print_block(right);
 	if (is_free(right)) { //if right block free, put free back into list with right length
+		puts("right is free");
 		if (right -> prev != NULL)
 			right -> prev -> next = bl;
 		if (right -> next != NULL)
 			right -> next -> prev = bl;
 		bl -> length += right -> length + sizeof(block);
+
+		total_free += sizeof(block);
+		puts("block: ");
+		print_block(bl);
 	}
+
+	// block* left = find_left(bl);
+
 
 	if (bl -> prev != NULL) {
 		bl -> prev -> next = bl;
@@ -240,15 +253,37 @@ void my_free(void *ptr) {
 		bl -> next -> prev = bl;
 	}
 
+	puts("head: ");
+	print_block(head);
+
 	if (bl < head) {
+		puts("smaller than head");
 		bl -> next = head;
 		head = bl;
+	} else { //add bl to free list
+		block *cur = head;
+		while (cur != NULL) {
+			if (cur -> next == NULL) {
+				cur -> next = bl;
+				bl -> prev = cur;
+				break;
+			} else if (cur < bl && bl < cur -> next) {
+				bl -> next = cur -> next;
+				bl -> prev = cur;
+				cur -> next = bl;
+				break;
+			}
+			cur = cur -> next;
+		}
 	}
+
+	print_block(bl);
     //deallocates block of memory pointed by ptr
     //ptr should be an address previously allocated by the Memory Allocation Package
     //if ptr is NULL, don't do anything
     //does not lower program break all the time: simply adds to list of free blocks
-    //lower program break when top free block is larger than 128KB
+    //TODO: lower program break when top free block is larger than 128KB
+
 
     total_free += length;
     total_allocated -= length;
@@ -345,6 +380,7 @@ int main(int argc, char *argv[]) {
 
 
 	puts("TEST 4: Free the 10KB pointer");
+	init = (long)sbrk(0);
 	my_free(ten_kb_ptr);
 	my_mallinfo();
 
@@ -355,6 +391,15 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("TEST 4 FAILED: malloc moved program break by %ld \n\n", change_in_pb);
 	}
+
+	// puts("TEST 5: Free the 1KB pointer");
+	// my_free(one_kb_ptr);
+	// my_mallinfo();
+
+
+	puts("TEST 5: Free the 300KB pointer");
+	my_free(three_hundred_kb_ptr);
+	my_mallinfo();
 
 	// print_free_list();
 
