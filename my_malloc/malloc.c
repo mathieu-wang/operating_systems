@@ -214,6 +214,33 @@ int is_free(block* ptr) { //checks whether ptr is in the free blocks list
 	return 0;
 }
 
+block* find_left(block* ptr) {
+	block *cur = head;
+	while (cur != NULL) {
+		if (cur + cur->length/sizeof(block) == ptr) {
+			return cur;
+		}
+		cur = cur -> next;
+	}
+	return (block*)-1;
+}
+
+void reduce_last_free_block_if_larger_than_128_kb() {
+	block *cur = head;
+	//assume head is not null
+	while (cur -> next != NULL) { //go to last free block
+		cur = cur -> next;
+	}
+	int excess = cur -> length - 128*ONE_KB;
+
+	if (excess > 0) {
+		printf("Last block has %d bytes (%d KB) of free memory, reducing it to 128KB", cur->length, (cur->length)/1024);
+		cur -> length = 128*ONE_KB;
+		sbrk(-1*(excess+sizeof(block)));//add a sizeof(block) so free memory is really 128KB
+		total_free -= excess;
+	}
+}
+
 void my_free(void *ptr) {
 	if (ptr == NULL) {
 		return; //do nothing if ptr is null
@@ -222,52 +249,75 @@ void my_free(void *ptr) {
 
 	int length = bl -> length;
 
-	printf("length of ptr to be freed: %d\n", length);
+	// printf("length of ptr to be freed: %d, total free: %d\n", length, total_free);
 
 	block* right = bl + length/sizeof(block);
 
-	puts("Current block: ");
-	print_block(bl);
-	puts("RIGHT BLOCK: ");
-	print_block(right);
+	// puts("Current block: ");
+	// print_block(bl);
+	// puts("RIGHT BLOCK: ");
+	// print_block(right);
 	if (is_free(right)) { //if right block free, put free back into list with right length
-		puts("right is free");
+		puts("right is free, merging...");
+		//remove right from list
 		if (right -> prev != NULL)
 			right -> prev -> next = bl;
 		if (right -> next != NULL)
 			right -> next -> prev = bl;
+		bl -> prev = right -> prev;
+		bl -> next = right -> next;
 		bl -> length += right -> length + sizeof(block);
 
 		total_free += sizeof(block);
-		puts("block: ");
-		print_block(bl);
+		// puts("block: ");
+		// print_block(bl);
 	}
 
-	// block* left = find_left(bl);
+	block* left = find_left(bl);
 
+	if ((long)left != -1) { //left is free
+		puts("left is free; merging...");
+		// puts("LEFT: ");
+		// print_block(left);
 
-	if (bl -> prev != NULL) {
-		bl -> prev -> next = bl;
+		//remove bl from list
+		if (bl -> prev != NULL)
+			bl -> prev -> next = left;
+		if (bl -> next != NULL)
+			bl -> next -> prev = left;
+		left -> prev = bl -> prev;
+		left -> next = bl -> next;
+		left -> length += bl -> length + sizeof(block);
+
+		// puts("NEW LEFT AFTER MERGING: ");
+		// print_block(left);
+
+		bl = left;
+
+		total_free += sizeof(block);
 	}
-	if (bl -> next != NULL) {
-		bl -> next -> prev = bl;
-	}
 
-	puts("head: ");
-	print_block(head);
+	// puts("head: ");
+	// print_block(head);
 
 	if (bl < head) {
-		puts("smaller than head");
+		// puts("smaller than head");
 		bl -> next = head;
 		head = bl;
+	} else if (bl == head) {
+		//do nothing
 	} else { //add bl to free list
 		block *cur = head;
 		while (cur != NULL) {
+			// puts("CUR: ");
+			// print_block(cur);
 			if (cur -> next == NULL) {
+				// puts("CUR HAS NO NEXT");
 				cur -> next = bl;
 				bl -> prev = cur;
 				break;
 			} else if (cur < bl && bl < cur -> next) {
+				// puts("BL BETWEEN CUR AND CUR -> NEXT");
 				bl -> next = cur -> next;
 				bl -> prev = cur;
 				cur -> next = bl;
@@ -277,14 +327,12 @@ void my_free(void *ptr) {
 		}
 	}
 
-	print_block(bl);
-    //deallocates block of memory pointed by ptr
-    //ptr should be an address previously allocated by the Memory Allocation Package
-    //if ptr is NULL, don't do anything
-    //does not lower program break all the time: simply adds to list of free blocks
-    //TODO: lower program break when top free block is larger than 128KB
+	// puts("BLOCK AFTER EVERYTHING");
+	// print_block(bl);
 
+	reduce_last_free_block_if_larger_than_128_kb();
 
+	// printf("total free: %d, Length to be added to free: %d\n", total_free, length);
     total_free += length;
     total_allocated -= length;
 }
@@ -398,8 +446,18 @@ int main(int argc, char *argv[]) {
 
 
 	puts("TEST 5: Free the 300KB pointer");
+	init = (long)sbrk(0);
 	my_free(three_hundred_kb_ptr);
 	my_mallinfo();
+
+	current_pb = (long)sbrk(0);
+	change_in_pb = current_pb - init;
+	if(change_in_pb == -(255*1024+2*sizeof(block))) {
+		puts("TEST 5 PASSED: malloc moved the program break by -255KB and successfully freed the 300KB pointer\n");
+	} else {
+		printf("TEST 5 FAILED: malloc did not move program break by -255KB,  %ldKB instead\n\n", change_in_pb);
+	}
+
 
 	// print_free_list();
 
