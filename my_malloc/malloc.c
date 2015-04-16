@@ -97,7 +97,7 @@ void *my_malloc(int size) {
     block *ptr = head;
     void *init_pb = sbrk(0);
 
-    printf("sbrk(0): %p\n", init_pb);
+    // printf("sbrk(0): %p\n", init_pb);
 
     if (ptr == NULL) {
         printf("%s\n", "Head is NULL, need to request memory.");
@@ -119,7 +119,7 @@ void *my_malloc(int size) {
 
     }
 
-    printf("sbrk(0): %ld\n", (long)sbrk(0));
+    // printf("sbrk(0): %ld\n", (long)sbrk(0));
 
 
     block *free_block = find_free(size);
@@ -152,34 +152,13 @@ void *my_malloc(int size) {
     
     //IF FREE_BLOCK IS HEAD, NEED TO HAVE SPECIAL CASE
     if (free_block == head) {
-    	print_block(head);
-    	// printf("sbrk(0): %p\n", sbrk(0));
     	int new_length = head->length - size;
     	block* next = head -> next;
-
-    	// printf("new length: %d\n", new_length);
-
-    	// printf("old head : %ld\n", (long)head);
-    	// printf("old head + size : %ld\n", (long)(head + size));
-    	// printf("old head + 10240 : %ld\n", (long)(head + 10240));
     	head = head + size/sizeof(block);
-
-    	// printf("size: %d\n", size);
-    	// printf("sbrk(0): %ld\n", (long)sbrk(0));
-
-    	// printf("new head: %ld\n", (long)head);
-
-    	// printf("diff: %ld\n", (long)head - (long)sbrk(0));
     	head -> length = new_length;
     	head -> next = next;
 
     	ptr -> length -= (head -> length); //update length of old head (ptr)
-
-    	puts("ptr to be returned: ");
-    	print_block(ptr);
-
-    	puts("new head:");
-    	print_block(head);
     } else {
     	if (free_block -> length == size) { //same size requested as the free block's length, simply remove it from free block list
     		puts("Exact free space left.");
@@ -361,21 +340,9 @@ void my_mallinfo() {
     printf("Largest Contiguous Free Space:   %d (= %d KB)\n\n", largest_contiguous_free, largest_contiguous_free/1024);
 }
 
-int main(int argc, char *argv[]) {
-	// printf("min_req_size: %d\n", min_req_size);
+int main(int argc, char *argv[]) {;
     long init = (long)sbrk(0);
-    // printf("Initial Address: %ld\n", init);
 
- //    puts("Test find_free with first fit policy:");
- //    my_mallopt(FIRST_FIT);
- //    puts("Before allocating, try to find a free block of 3KB, should return NULL.");
- //    block *free_block = find_free(3*ONE_KB);
-
- //    if (free_block == NULL) {
- //        puts("Pass: Could not find a free block of 3KB.");
- //    } else {
- //        puts("Fail: found a free block of 3KB.");
- //    }
     puts("TEST 1: Allocate one KB");
 
 	void *one_kb_ptr = my_malloc(ONE_KB);
@@ -440,11 +407,6 @@ int main(int argc, char *argv[]) {
 		printf("TEST 4 FAILED: malloc moved program break by %ld \n\n", change_in_pb);
 	}
 
-	// puts("TEST 5: Free the 1KB pointer");
-	// my_free(one_kb_ptr);
-	// my_mallinfo();
-
-
 	puts("TEST 5: Free the 300KB pointer");
 	init = (long)sbrk(0);
 	my_free(three_hundred_kb_ptr);
@@ -457,29 +419,6 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("TEST 5 FAILED: malloc did not move program break by -255KB,  %ldKB instead\n\n", change_in_pb);
 	}
-
-
-	// print_free_list();
-
-    // puts("After allocating 2KB, try to find a free block of 3KB, should return a block of size 128KB (Minimum request to sbrk).");
-    // my_malloc(2*ONE_KB);
-    // free_block = find_free(3*ONE_KB);
-    // if (free_block == NULL) {
-    //     puts("Fail: Could not find a free block of 3KB.");
-    // } else {
-    //     puts("Pass: found a free block of 3KB.");
-    // }
-
-
-    // printf("Size of block: %d\n", (int)sizeof(block));
-    // printf("Size of block*: %d\n", (int)sizeof(block*));
-    // printf("Size of int: %d\n", (int)sizeof(int));
-    // printf("Size of char: %d\n", (int)sizeof(char));
-    // printf("Size of char*: %d\n", (int)sizeof(char*));
-    // printf("Address of head:%ld\n", (long)head);
-    // long final = (long)sbrk(0);
-    // printf("Final Address: %ld\n", final);
-    // printf("Difference: %ld\n", final - init);
 
     return 0;
 }
